@@ -81,3 +81,18 @@ conda install pytest # Only run this once
 pytest
 pytest aura/tests # (If the latter doesn't work)
 ```
+
+### Pushing to Source
+1. Make sure you pull first 
+```bash
+git pull
+# If there are any conflicts, use `git stash`, then `git pull`, and then `git stash pop`. Address the conflicts there using VSCode Merge Editor
+```
+2. Commit your changes to a new branch
+```bash
+git add .
+git commit -m "<your-message>"
+git checkout -b <your_github_name>/<your_branch_feature>
+git push -u origin <your_github_name>/<your_branch_feature>
+```
+3. Create a Pull Request for your branch on GitHub
