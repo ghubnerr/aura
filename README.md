@@ -61,6 +61,7 @@ Make sure you run this prior:
 `maturin develop --extras tests`
 
 <b>Testing Rust Source Code</b>
+
 Download Rust [here](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 ```bash
 cargo test
