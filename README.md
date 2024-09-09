@@ -22,6 +22,8 @@
 ```
 WTF is going on?
 - The project supports rust-built Python modules as binaries if we need to do something fast i.e. a long Regex, camera I/O, etc :)
+
+
 Where you should be working:
 - Python Modules: i.e. Camera input: `aura/camera/` [How to write Python modules](https://arc.net/l/quote/tmyndbro)
 - Rust Packages for fast inferencing: `src/lib.rs` (or another Rust module location inside `src`)
