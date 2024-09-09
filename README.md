@@ -8,7 +8,7 @@ Initiate your conda environment. To donwload Anaconda and manage your Python env
 
 ```bash
 conda create -n aura python=3.10
-conda activate aura // Run this every time you open your project
+conda activate aura # Run this every time you open your project
 ```
 
 We'll be using `PyO3` + `Maturin` to integrate Rust and Python in the same package in case we need anything that executes fast. [(Read more here)](https://medium.com/@MatthieuL49/a-mixed-rust-python-project-24491e2af424)
