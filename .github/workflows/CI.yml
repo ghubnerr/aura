@@ -11,8 +11,22 @@ on:
       - main
       - master
     tags:
-      - '*'
+      - "*"
+    paths:
+      - "src/**/*.rs"
+      - "aura/**/*.py"
+      - "pyproject.toml"
+      - "Cargo.toml"
+      - "requirements.txt"
+      - "pyproject.toml"
   pull_request:
+    paths:
+      - "src/**/*.rs"
+      - "aura/**/*.py"
+      - "pyproject.toml"
+      - "Cargo.toml"
+      - "requirements.txt"
+      - "pyproject.toml"
   workflow_dispatch:
 
 permissions:
@@ -46,7 +60,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -77,7 +91,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
           manylinux: musllinux_1_2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -105,7 +119,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -131,7 +145,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
