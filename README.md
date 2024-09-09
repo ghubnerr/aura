@@ -1,4 +1,29 @@
 # Aura
+### File Structure
+```bash
+.
+├── Cargo.lock
+├── Cargo.toml
+├── LICENSE
+├── README.md
+├── aura
+│   ├── __init__.py
+│   ├── aura.cpython-310-darwin.so
+│   └── tests
+│       ├── __pycache__
+│       └── test_all.py
+├── notebooks
+│   └── hello_world.ipynb
+├── pyproject.toml
+├── requirements.txt
+├── src
+│   └── lib.rs
+└── target
+```
+Where you should be working:
+- Python Modules: i.e. Camera input: `aura/camera/` [How to write Python modules](https://arc.net/l/quote/tmyndbro)
+- Rust Packages for fast inferencing: `src/lib.rs` (or another Rust module location inside `src`)
+- Jupyter Notebooks for AI stuff: `/notebooks`
 
 ## Development
 
@@ -52,13 +77,7 @@ This is an issue with a PATH variable that Maturin is using to access a Python f
 conda install pytest # Only run this once
 ```
 
-Running tests:
-
 ```bash
 pytest
 pytest aura/tests # (If the latter doesn't work)
 ```
-
-### `/notebooks`
-
-This is where all jupyter notebooks for testing models will be! AI folks work here mostly~ <3
