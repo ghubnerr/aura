@@ -4,6 +4,13 @@
 
 > Note: If you're developing on VSCode, download the necessary extensions to make your life easier (e.g. Jupyter Notebooks, Rust Analyzer, PyLint)
 
+In your desired project location, run: 
+
+```bash
+git clone https://github.com/ghubnerr/aura
+cd aura
+```
+
 Initiate your conda environment. To donwload Anaconda and manage your Python environments, go [here](https://www.anaconda.com/download). Here we're using Python 3.10
 
 ```bash
