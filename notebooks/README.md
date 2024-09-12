@@ -46,6 +46,13 @@ jupyter notebook --NotebookApp.allow_origin='https://colab.research.google.com' 
 
 ![Result](../docs/image-1.png)
 
+### 1.1 Using on-campus A100's on our project, on Colab :)
+There are 4 compute services at FIU that no one knows about! Not even Trevor Cickovski knew LOL 
+| Onyx | Diamond | Quartz |
+|---------|---------|---------|
+| ![Onyx](../docs/onyx.png) | ![Diamond](../docs/diamond.png) | ![Quartz](../docs/quartz.png) |
+
+
 ## 2. Using Colab traditionally (with imported files)
 
 You will want to do this when:
@@ -62,6 +69,7 @@ Export the entire repo `/aura` into your Google Drive, and you'll be able to acc
 from google.colab import drive
 drive.mount('/content/drive')
 ```
+
 
 <br>
 <br>
