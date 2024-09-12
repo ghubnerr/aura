@@ -55,6 +55,9 @@ Installing Python Dependencies
 pip install -r requirements.txt
 ```
 
+### Using A100's for free to run our code in Colab
+- Follow instructions in [/notebooks](https://github.com/ghubnerr/aura/blob/main/notebooks/README.md) to connect to clusters and still run our repo.
+
 ### Running Tests
 
 Make sure you run this prior:
