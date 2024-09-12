@@ -63,9 +63,16 @@ ssh <fiu_username>@onyx.cs.fiu.edu -v
   - Your Panther ID
   - The first letter of your last name
 4. You can now go into your VSCode and use your RemoteSSH extension to connect to the cluster. If you have a Mac, you can also use `Microsoft Remote Desktop` (App Store) and access the GUI of the machine.
-5. You'll now follow the exact same instructions as the project README to install the repo and build it with Rust. You'll have to run Shell commands, so that means installing [Miniconda](https://arc.net/l/quote/bhzadcnf), Rust, and Python (likely don't have to) with Shell commands.
-  - You can download the installer for Miniconda, and run `scp <installer/file/location> <fiu_username>@<cluser_name>.cs.fiu.edu:~/`
-  - Open the cluster shell, run `bash <conda-installer-name>-latest-Linux-x86_64.sh`
+5. You're almost ready to follow the instructions in the root [README]("https://github.com/ghubnerr/aura/blob/main/README.md") on setting up the repository, but your campus endpoint might not have anaconda installed. Here are the steps to do so:
+  - You can download the installer for [Miniconda](https://arc.net/l/quote/bhzadcnf), and run
+```bash
+# If you're not an administrator to your campus endpoint, you can't run `sudo dnf install`
+scp <installer/file/location> <fiu_username>@<cluser_name>.cs.fiu.edu:~/
+```
+  - After finishing the Miniconda installation process, open the cluster shell, and run
+```bash
+bash <conda-installer-name>-latest-Linux-x86_64.sh
+```
   - Note, the ocelot shell is a TENEX C Shell by default, so you have to do the following after running:
   - Do `nano ~/.tcshrc` and paste `source ~/miniconda3/etc/profile.d/conda.csh`
   - You can now run `conda` commands normally
