@@ -56,7 +56,7 @@ What you'll have to do:
 1. Pick an endpoint (all of them are `<name>.cs.fiu.edu` i.e. `onyx.cs.fiu.edu`)
 2. SSH into it using your terminal. `-v` is for verbose, so you'll see the output.
 ```bash
-ssh <fiu_username>@onyx.cs.fiu.edu> -v
+ssh <fiu_username>@onyx.cs.fiu.edu -v
 ```
 3. Enter your password -- this will be the exact same password you use for `ocelot.aul.fiu.edu`. If you've never used ocelot, it will be:
   - The first letter of your last name
