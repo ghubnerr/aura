@@ -48,9 +48,32 @@ jupyter notebook --NotebookApp.allow_origin='https://colab.research.google.com' 
 
 ### 1.1 Using on-campus A100's on our project, on Colab :)
 There are 4 compute services at FIU that no one knows about! Not even Trevor Cickovski knew LOL 
-| Onyx | Diamond | Quartz |
-|---------|---------|---------|
-| ![Onyx](../docs/onyx.png) | ![Diamond](../docs/diamond.png) | ![Quartz](../docs/quartz.png) |
+| Onyx | Diamond | Quartz | Ruby |
+|---------|---------|---------|---------|
+| ![Onyx](../docs/onyx.png) | ![Diamond](../docs/diamond.png) | ![Quartz](../docs/quartz.png) | `ruby.cs.fiu.edu` |
+
+What you'll have to do:
+1. Pick an endpoint (all of them are `<name>.cs.fiu.edu` i.e. `onyx.cs.fiu.edu`)
+2. SSH into it using your terminal. `-v` is for verbose, so you'll see the output.
+```bash
+ssh <fiu_username>@onyx.cs.fiu.edu> -v
+```
+3. Enter your password -- this will be the exact same password you use for `ocelot.aul.fiu.edu`. If you've never used ocelot, it will be:
+  - The first letter of your last name
+  - Your Panther ID
+  - The first letter of your last name
+4. You can now go into your VSCode and use your RemoteSSH extension to connect to the cluster. If you have a Mac, you can also use `Microsoft Remote Desktop` (App Store) and access the GUI of the machine.
+5. You'll now follow the exact same instructions as the project README to install the repo and build it with Rust. You'll have to run Shell commands, so that means installing [Miniconda](https://arc.net/l/quote/bhzadcnf), Rust, and Python (likely don't have to) with Shell commands.
+  - You can download the installer for Miniconda, and run `scp <installer/file/location> <fiu_username>@<cluser_name>.cs.fiu.edu:~/
+  - Open the cluster shell, run `bash <conda-installer-name>-latest-Linux-x86_64.sh`
+  - Note, the ocelot shell is a TENEX C Shell by default, so you have to do the following after running:
+  - Do `nano ~/.tcshrc` and paste `source ~/miniconda3/etc/profile.d/conda.csh`
+  - You can now run `conda` commands normally
+  - Note 2, for Linux, use `export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"` if `cargo test` doesn't work
+6. You'll then come here and follow the same instructions as #1 to connect to Colab with local runtime.
+<img width="750" alt="image" src="https://github.com/user-attachments/assets/c83b5020-d8f2-4a2b-abfc-10a5aca32733">
+
+Enjoy 8 A100's that also run Rust. In Colab :)
 
 
 ## 2. Using Colab traditionally (with imported files)
@@ -69,7 +92,6 @@ Export the entire repo `/aura` into your Google Drive, and you'll be able to acc
 from google.colab import drive
 drive.mount('/content/drive')
 ```
-
 
 <br>
 <br>
