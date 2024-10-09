@@ -72,8 +72,26 @@ cargo test
 
 If this doesn't work, try running:
 
+For MacOS
 ```bash
 export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
+```
+
+For Linux (using `tsch`) -> `onyx` uses `tsch`
+```bash
+setenv LD_LIBRARY_PATH "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
+```
+- You will want to add this into your `~/.tcshrc` file (use `nano ~/.tcshrc`):
+```bash
+source ~/miniconda3/etc/profile.d/conda.csh 
+setenv PATH "${PATH}:$HOME/.cargo/bin"
+if ($?CONDA_PREFIX) then
+    if ($?LD_LIBRARY_PATH) then
+        setenv LD_LIBRARY_PATH ${CONDA_PREFIX}/lib:$LD_LIBRARY_PATH
+    else
+        setenv LD_LIBRARY_PATH ${CONDA_PREFIX}/lib
+    endif
+endif
 ```
 
 This is an issue with a PATH variable that Maturin is using to access a Python file. I'm trying to see if there's a way to make this automatic.
