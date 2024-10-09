@@ -93,6 +93,28 @@ if ($?CONDA_PREFIX) then
     endif
 endif
 ```
+- If it still doesn't work, do this:
+```bash
+conda activate aura
+echo $CONDA_PREFIX # make sure this works
+mkdir -p $CONDA_PREFIX/etc/conda/activate.d
+touch $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
+nano $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
+```
+- Write this:
+```bash
+#!/bin/tcsh
+setenv LD_LIBRARY_PATH ${CONDA_PREFIX}/lib
+```
+- Save it and run this:
+```bash
+chmod +x $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
+```
+- Now run
+```bash
+conda deactivate
+conda activate aura
+```
 
 This is an issue with a PATH variable that Maturin is using to access a Python file. I'm trying to see if there's a way to make this automatic.
 <br/>
