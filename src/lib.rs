@@ -13,7 +13,7 @@ fn is_prime(num: u32) -> bool {
         _ => {
             let limit = (num as f32).sqrt() as u32;
 
-            (2..=limit).any(|i| num % i == 0) == false
+            !(2..=limit).any(|i| num % i == 0)
         }
     }
 }
@@ -33,15 +33,15 @@ mod tests {
 
     #[test]
     fn simple_test_false() {
-        assert_eq!(is_prime(0), false);
-        assert_eq!(is_prime(1), false);
-        assert_eq!(is_prime(12), false)
+        assert!(!is_prime(0));
+        assert!(!is_prime(1));
+        assert!(!is_prime(12))
     }
 
     #[test]
     fn simple_test_true() {
-        assert_eq!(is_prime(2), true);
-        assert_eq!(is_prime(3), true);
-        assert_eq!(is_prime(41), true)
+        assert!(is_prime(2));
+        assert!(is_prime(3));
+        assert!(is_prime(41));
     }
 }
