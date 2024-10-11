@@ -64,7 +64,7 @@ ssh <fiu_username>@onyx.cs.fiu.edu -v
 
 3. Enter your password -- this will be the exact same password you use for `ocelot.aul.fiu.edu`. If you've never used ocelot, it will be:
 
-- The first letter of your last name
+- The first letter of your first name
 - Your Panther ID
 - The first letter of your last name
 
