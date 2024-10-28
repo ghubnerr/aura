@@ -19,6 +19,7 @@
 ├── src
 │   └── lib.rs
 └── target
+
 ```
 WTF is going on?
 - The project supports rust-built Python modules as binaries if we need to do something fast i.e. a long Regex, camera I/O, etc :)
