@@ -1,1 +1,76 @@
+# Core Python Packages
+anyio
+appnope
+arrow==1.3.0
+attrs
+certifi
+cffi
+charset-normalizer
+comm
+debugpy
+decorator
+exceptiongroup
+fqdn==1.5.1
+idna
+iniconfig
+packaging
+platformdirs
+ply==3.11
+psutil
+pycparser
+PyYAML
+six
+tomli
+typing_extensions
+zipp
+
+# Jupyter Related
+ipykernel
+ipython
+ipywidgets
+jupyter
+jupyter-console
+jupyter-events
+jupyter-http-over-ws
+jupyter-lsp
+jupyter_client
+jupyter_core
+jupyter_server
+jupyter_server_terminals
+jupyterlab
+jupyterlab-pygments
+jupyterlab-widgets
+jupyterlab_server
+notebook
+notebook_shim
+
+# Web & HTTP
+Brotli
+h11
+httpcore
+httpx
+requests
+sniffio
+urllib3
+websocket-client
+websockets==14.1
+
+# Data Processing & Formatting
+beautifulsoup4
+fastjsonschema
+json5==0.9.25
+jsonpointer==3.0.0
+jsonschema
+PyQt5==5.15.10
+PyQt5-sip
+rfc3339-validator
+rfc3986-validator
+soupsieve
+webcolors==1.3.0
+
+# Testing
+pytest==8.3.2
+pytest-asyncio==0.24.0
+
+# Development Tools
 maturin==1.7.1
