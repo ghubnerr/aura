@@ -3,6 +3,7 @@
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+__pycache__/*
 .pytest_cache/
 *.py[cod]
 
@@ -74,3 +75,9 @@ docs/_build/
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
+
+.kaggle/*
+
+
+*.ivf
+*.mp4
