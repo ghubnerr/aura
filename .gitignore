@@ -77,3 +77,6 @@ docs/_build/
 
 .kaggle/*
 
+
+*.ivf
+*.mp4
