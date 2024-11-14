@@ -18,13 +18,11 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
-    # Register signal handler for graceful shutdown
     signal.signal(signal.SIGINT, signal_handler)
 
     # port = get_free_port()
     port = 8765
     
-    # Create and start the signaling server
     server = SignalingServer(port=port)
     server.start()
     
@@ -32,7 +30,6 @@ def main():
     print("Press Ctrl+C to stop the server")
     
     try:
-        # Keep the main thread running
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
