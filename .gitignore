@@ -77,7 +77,7 @@ docs/_build/
 .ipynb_checkpoints/
 
 .kaggle/*
-
+kaggle.json
 
 *.ivf
 *.mp4
