@@ -52,7 +52,7 @@ enum SignalingMessage {
 struct SignalingServer {
     peers: Peers,
     port: u16,
-    ip: String, // Add IP address field
+    ip: String, 
 }
 
 #[pymethods]
@@ -125,7 +125,6 @@ impl SignalingServer {
     }
 }
 
-// Helper function to share peers between routes
 fn with_peers(
     peers: Peers,
 ) -> impl Filter<Extract = (Peers,), Error = std::convert::Infallible> + Clone {
@@ -184,7 +183,7 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-    let peers = peers.lock().await; // Await the async Mutex lock
+    let peers = peers.lock().await; 
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
             let mut client = client.lock().await; // Await the async Mutex lock
@@ -415,14 +414,14 @@ fn aura(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
 
-    #[test] // Note: changed from tokio::test to regular test
+    #[test]
     fn test_server_creation() {
         let server = SignalingServer::new(Some(3031), Some("127.0.0.1".to_string()));
         assert_eq!(server.port, 3031);
         assert_eq!(server.ip, "127.0.0.1");
     }
 
-    #[test] // Note: changed from tokio::test to regular test
+    #[test] 
     fn test_server_default_values() {
         let server = SignalingServer::new(None, None);
         assert_eq!(server.port, 3030);
