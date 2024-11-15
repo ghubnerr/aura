@@ -20,6 +20,7 @@ on:
       - "Cargo.toml"
       - "requirements.txt"
       - "pyproject.toml"
+      - "*.yml"
   pull_request:
     paths:
       - "src/**/*.rs"
@@ -37,13 +38,42 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        target:
-          - x86_64
-          - x86
-          - armv7
-          - s390x
-          - ppc64le
+        target: [x86_64-unknown-linux-gnu, i686-unknown-linux-gnu, armv7-unknown-linux-gnueabihf, s390x-unknown-linux-gnu, powerpc64le-unknown-linux-gnu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install cross-compilation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-multilib
+          case ${{ matrix.target }} in
+            *armv7*) sudo apt-get install -y gcc-arm-linux-gnueabihf ;;
+            *s390x*) sudo apt-get install -y gcc-s390x-linux-gnu ;;
+            *powerpc64le*) sudo apt-get install -y gcc-powerpc64le-linux-gnu ;;
+          esac
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --find-interpreter
+          sccache: 'true'
+          manylinux: auto
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist
+          
+  musllinux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-musl, i686-unknown-linux-musl, armv7-unknown-linux-musleabihf]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -55,45 +85,11 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: auto
-        env:
-          CARGO_BUILD_TARGET: ${{ matrix.target }}-unknown-linux-gnu
-          RUSTFLAGS: '--cfg target_feature="neon"'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-${{ matrix.target }}
-          path: dist
-          
-  musllinux:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64
-          - runner: ubuntu-latest
-            target: x86
-          - runner: ubuntu-latest
-            target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
-          sccache: "true"
           manylinux: musllinux_1_2
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-musllinux-${{ matrix.platform.target }}
+          name: wheels-musllinux-${{ matrix.target }}
           path: dist
 
   windows:
