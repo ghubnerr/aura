@@ -52,7 +52,7 @@ enum SignalingMessage {
 struct SignalingServer {
     peers: Peers,
     port: u16,
-    ip: String, // Add IP address field
+    ip: String, 
 }
 
 #[pymethods]
@@ -184,7 +184,7 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-    let peers = peers.lock().await; // Await the async Mutex lock
+    let peers = peers.lock().await; 
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
             let mut client = client.lock().await; // Await the async Mutex lock
