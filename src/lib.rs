@@ -415,14 +415,14 @@ fn aura(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
 
-    #[test] // Note: changed from tokio::test to regular test
+    #[test]
     fn test_server_creation() {
         let server = SignalingServer::new(Some(3031), Some("127.0.0.1".to_string()));
         assert_eq!(server.port, 3031);
         assert_eq!(server.ip, "127.0.0.1");
     }
 
-    #[test] // Note: changed from tokio::test to regular test
+    #[test] 
     fn test_server_default_values() {
         let server = SignalingServer::new(None, None);
         assert_eq!(server.port, 3030);
