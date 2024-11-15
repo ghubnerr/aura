@@ -29,15 +29,13 @@ jobs:
       with:
         python-version: "3.10"
 
-    # Create a virtual environment and activate it
-    - name: Set up virtual environment
-      run: |
-        python -m venv .venv
-        echo ". .venv/bin/activate" >> $GITHUB_ENV
-    
+    # Create a virtual environment
+    - name: Create virtual environment
+      run: python -m venv .venv
+
     - name: Install dependencies
       run: |
-        . .venv/bin/activate
+        source .venv/bin/activate
         python -m pip install --upgrade pip
         pip install flake8 pytest maturin
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
@@ -45,16 +43,16 @@ jobs:
     # Build the Rust extension in development mode using Maturin
     - name: Build and install Rust extension
       run: |
-        . .venv/bin/activate
+        source .venv/bin/activate
         maturin develop
 
     - name: Lint with flake8
       run: |
-        . .venv/bin/activate
+        source .venv/bin/activate
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Test with pytest
       run: |
-        . .venv/bin/activate
+        source .venv/bin/activate
         pytest
