@@ -125,7 +125,6 @@ impl SignalingServer {
     }
 }
 
-// Helper function to share peers between routes
 fn with_peers(
     peers: Peers,
 ) -> impl Filter<Extract = (Peers,), Error = std::convert::Infallible> + Clone {
