@@ -19,8 +19,6 @@ on:
       - "Cargo.toml"
       - "requirements.txt"
       - "pyproject.toml"
-      - "*.yml"
-      - "*.yaml"
   pull_request:
     paths:
       - "src/**/*.rs"
@@ -52,7 +50,6 @@ jobs:
             target: s390x
           - runner: ubuntu-latest
             target: ppc64le
-      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,13 +59,9 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: >-
-            --release --out dist --find-interpreter
-            --cargo-extra-args="--config target.aarch64-unknown-linux-gnu.rustflags='-C target-feature=+neon,+fp-armv8,+v8.1a -C target-cpu=generic+v8.1a -C target-arch=armv8-a'"
+          args: --release --out dist --find-interpreter
           sccache: "true"
           manylinux: auto
-          env:
-            CFLAGS: "-D__ARM_ARCH=8"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
