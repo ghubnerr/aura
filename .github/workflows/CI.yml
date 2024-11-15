@@ -19,6 +19,7 @@ on:
       - "Cargo.toml"
       - "requirements.txt"
       - "pyproject.toml"
+      - "*.yml"
       - "*.yaml"
   pull_request:
     paths:
