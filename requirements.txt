@@ -1,1 +1,2 @@
 maturin==1.7.1
+git+https://github.com/NUS-HPC-AI-Lab/VideoSys.git@master#egg=videosys
