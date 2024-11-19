@@ -1,6 +1,6 @@
 from typing import *
-from sim_clr import SimCLR
-from camera import ProcessingPipeline
+from aura.sim_clr import SimCLR
+from aura.camera import ProcessingPipeline
 from tqdm import tqdm
 from .provider import DatasetProvider
 import openai
@@ -8,7 +8,9 @@ from PIL import Image
 import io
 import os
 from dotenv import load_dotenv
+import subprocess
 import base64
+import json
 import numpy as np
 
 TEMP_IMAGE_PATH = "./temp"
@@ -43,38 +45,76 @@ class PairsGenerator:
 
         return embedding, video
     
-
-    def _generate_text_description(self, image: Image.Image) -> str:
+    @staticmethod
+    def _generate_text_description(image: Image.Image, model: str = "ollama/bakllava") -> str:
         """
         Generates a text description of the emotion image using GPT-4 Vision.
         Wrapped in a default prompt engineered message.
         """
+        # Convert PIL image to base64
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-        load_dotenv()
-        api_key = os.getenv("OPENAI_API_KEY")
+        user_query = """
+            Look at this image carefully and analyze the person's facial expression.
+            What emotion is being displayed?
+            Respond with 1-3 emotion-related words only (e.g., 'happy', 'sad', 'angry', etc.).
+            Do not include percentages or technical details.
+            """
 
-        if not api_key:
-            raise Exception("OPENAI_API_KEY not provided")
+        if model.startswith("ollama"):
+            import requests
+            
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": model.split("/")[1],
+                    "prompt": user_query,
+                    "images": [base64_image],
+                    "stream": False
+                }
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Error from Ollama API: {response.text}")
+            
+            responses = [json.loads(line) for line in response.text.strip().split('\n')]        
+            
+            final_response = ""
+            for resp in responses:
+                if "response" in resp:
+                    final_response += resp["response"]
+                if "error" in resp:
+                    print(f"Error in response: {resp['error']}")
+            
+            model_response = final_response.strip()
+            
+            if not model_response:
+                raise Exception("Empty response from Ollama")
+                        
+            return model_response
 
-        openai.api_key = api_key
-        
-        try:
-            # Convert PIL image to base64
-            buffered = io.BytesIO()
-            image.save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        else: # OPENAI_API_KEY-based model i.e. "gpt-4-vision-preview"
+            load_dotenv()
+            api_key = os.getenv("OPENAI_API_KEY")
+
+            if not api_key:
+                raise Exception("OPENAI_API_KEY not provided")
+
+            openai.api_key = api_key
 
             client = openai.OpenAI()
             
             response = client.chat.completions.create(
-                model="gpt-4-vision-preview",
+                model=model,
                 messages=[
                     {
                         "role": "user",
                         "content": [
                             {
                                 "type": "text",
-                                "text": "Describe this person's emotion in up to three words. Make sure to use only nouns or adjectives."
+                                "text": user_query
                             },
                             {
                                 "type": "image_url",
@@ -90,12 +130,8 @@ class PairsGenerator:
 
             model_response = response.choices[0].message.content
             
-            # TODO: Add prompt engineering for the model here
-            return f"{model_response}"
-        
-        except Exception as e:
-            print(f"Error generating text description: {e}")
-            return "Error generating image description."
+        # TODO: Add prompt engineering for the model here
+        return f"{model_response}"
             
     def save_pairs(self, pair: Tuple, storage_path: str):
         """
@@ -114,7 +150,7 @@ class PairsGenerator:
 
             file_id = f"{hash(tuple(embedding))}_{len(video)}"
             embedding_path = os.path.join(local_path, f"embedding_{file_id}.npy")
-            video_path = os.path.join(local_path, f"video_{file_id}.mp4")
+            video_path = os.path.join(local_path, f"video_{file_id}.ivf")
 
             with open(embedding_path, "wb") as f:
                 np.save(f, embedding)
@@ -166,3 +202,5 @@ class PairsGenerator:
         """
         for _ in tqdm(range(count), desc="Generating pairs"):
             yield self.get_next_pair()
+
+
