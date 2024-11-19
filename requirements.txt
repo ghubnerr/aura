@@ -67,6 +67,10 @@ rfc3339-validator
 rfc3986-validator
 soupsieve
 webcolors==1.3.0
+python-dotenv
+openai
+tqdm
+datasets
 
 # Testing
 pytest==8.3.2
