@@ -16,13 +16,16 @@ import numpy as np
 TEMP_IMAGE_PATH = "./temp"
 
 class PairsGenerator:
-    def __init__(self, dataset_provider: DatasetProvider, simclr_model: SimCLR, processing_pipeline: ProcessingPipeline, video_generator):
+    def __init__(self, dataset_provider: DatasetProvider, 
+                 simclr_model: SimCLR, processing_pipeline: ProcessingPipeline, 
+                 video_generator: OpenSoraT2VideoPipeline|CogVideoXT2VideoPipeline,
+                 **kwargs):
         self.dataset_provider = dataset_provider
         self.simclr_model = simclr_model
         self.processing_pipeline = processing_pipeline
-        self.video_generator = video_generator
+        self.video_generator = video_generator(**kwargs)
 
-    def get_next_pair(self) -> Tuple:
+    def get_next_pair(self, **kwargs) -> Tuple:
         """
         Generates the next image embedding and video pair.
         """
@@ -35,7 +38,7 @@ class PairsGenerator:
         text_description = self._generate_text_description(image)
 
         # Generate a video from the text description
-        video = self.video_generator(text_description)
+        video = self.video_generator(text_description, **kwargs)
 
         # Preprocess the image using the processing pipeline
         processed_image = self.processing_pipeline.process(image)
@@ -130,7 +133,8 @@ class PairsGenerator:
 
             model_response = response.choices[0].message.content
                     
-        return f"Abstract art with swirls, curves, color, light, synesthesia, and shapes which represent the following emotion or idea: {model_response}"
+        return f"Abstract art with swirls, curves, color, light, synesthesia, and shapes \
+                 which represent the following emotion or idea: {model_response}"
             
     def save_pairs(self, pair: Tuple, storage_path: str):
         """
@@ -138,7 +142,8 @@ class PairsGenerator:
 
         Args:
         - pair: A tuple containing the image embedding and video.
-        - storage_path: Path to the storage location (local - local:// - or Hugging Face dataset - hf://).
+        - storage_path: Path to the storage location (local - local:// \
+                        - or Hugging Face dataset - hf://).
         """
 
         embedding, video = pair

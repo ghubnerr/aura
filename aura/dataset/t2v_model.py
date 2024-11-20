@@ -9,7 +9,7 @@ class CogVideoXT2VideoPipeline():
         config = CogVideoXConfig("THUDM/CogVideoX-2b", **kwargs)
         self.engine = VideoSysEngine(config)
 
-    def __call__(self, prompt: str, steps: int, path: str = "./dataset/temp/video.mp4"):
+    def __call__(self, prompt: str, steps: int = 30, path: str = "./dataset/temp/video.mp4"):
         video = self.engine.generate(prompt, num_inference_steps=steps).video[0]
         self.engine.save_video(video, f"{path}/video.mp4")
 
