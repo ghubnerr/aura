@@ -1,12 +1,13 @@
 import aura
-from PIL import Image
+
+import cv2
 
 class ProcessingPipeline:
     def __init__(self):
         # TODO Complete this method
         pass
 
-    def process(self, image: Image.Image):
+    def process(self, image: cv2.MatLike):
         # TODO Complete this method
         pass
 
