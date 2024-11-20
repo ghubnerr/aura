@@ -8,7 +8,7 @@ from PIL import Image
 import io
 import os
 from dotenv import load_dotenv
-import subprocess
+from .t2v_model import *
 import base64
 import json
 import numpy as np
@@ -129,9 +129,8 @@ class PairsGenerator:
             )
 
             model_response = response.choices[0].message.content
-            
-        # TODO: Add prompt engineering for the model here
-        return f"{model_response}"
+                    
+        return f"Abstract art with swirls, curves, color, light, synesthesia, and shapes which represent the following emotion or idea: {model_response}"
             
     def save_pairs(self, pair: Tuple, storage_path: str):
         """
@@ -150,7 +149,7 @@ class PairsGenerator:
 
             file_id = f"{hash(tuple(embedding))}_{len(video)}"
             embedding_path = os.path.join(local_path, f"embedding_{file_id}.npy")
-            video_path = os.path.join(local_path, f"video_{file_id}.ivf")
+            video_path = os.path.join(local_path, f"video_{file_id}.mp4")
 
             with open(embedding_path, "wb") as f:
                 np.save(f, embedding)
