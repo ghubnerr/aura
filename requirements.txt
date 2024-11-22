@@ -78,3 +78,5 @@ pytest-asyncio==0.24.0
 
 # Development Tools
 maturin==1.7.1
+
+opencv-python==4.10.0.84

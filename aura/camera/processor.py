@@ -1,13 +1,12 @@
 import aura
-
-import cv2
+import numpy as np
 
 class ProcessingPipeline:
     def __init__(self):
         # TODO Complete this method
         pass
 
-    def process(self, image: cv2.MatLike):
+    def process(self, image: np.ndarray):
         # TODO Complete this method
         pass
 
