@@ -1,6 +1,5 @@
 /target
 
-# Environment Variables
 .env
 
 # Byte-compiled / optimized / DLL files
@@ -83,3 +82,6 @@ kaggle.json
 
 *.ivf
 *.mp4
+*.png
+
+temp/

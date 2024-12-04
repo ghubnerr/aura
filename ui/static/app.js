@@ -1,6 +1,8 @@
 const signalingSocket = new WebSocket("ws://127.0.0.1:8765/signaling");
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
+
+
 const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
 });
@@ -8,7 +10,8 @@ const pc = new RTCPeerConnection({
 // WebSocket Event Handlers
 signalingSocket.onopen = () => {
     console.log("WebSocket connected!");
-    document.getElementById("startCall").disabled = false; // Enable button
+    document.getElementById("startCall").disabled = false;
+    document.getElementById("captureImage").disabled = false;
 };
 
 signalingSocket.onerror = (error) => {
@@ -65,7 +68,6 @@ signalingSocket.onmessage = async (message) => {
     const data = JSON.parse(message.data);
 
     if (data.type === "candidate") {
-        // Handle incoming ICE candidate
         if (data.candidate && (data.sdpMid !== null || data.sdpMLineIndex !== null)) {
             try {
                 const candidate = new RTCIceCandidate({
@@ -81,9 +83,7 @@ signalingSocket.onmessage = async (message) => {
         } else {
             console.warn("Skipping ICE candidate due to missing sdpMid or sdpMLineIndex", data);
         }
-
     } else if (data.type === "offer") {
-        // Handle incoming SDP offer
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(data));
             const answer = await pc.createAnswer();
@@ -93,15 +93,15 @@ signalingSocket.onmessage = async (message) => {
         } catch (error) {
             console.error("Error handling received offer", error);
         }
-
     } else if (data.type === "answer") {
-        // Handle incoming SDP answer
         try {
             await pc.setRemoteDescription(new RTCSessionDescription(data));
             console.log("Set remote description from answer");
         } catch (error) {
             console.error("Error setting remote description from answer", error);
         }
+    } else if (data.type === "image") {
+        console.log("Received image data:", data.data);
     }
 };
 
@@ -111,3 +111,72 @@ pc.ontrack = (event) => {
         remoteVideo.srcObject = event.streams[0];
     }
 };
+
+signalingSocket.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    if (message.type === "triggerimagecapture") {
+      console.log("Received trigger from server, capturing frame...");
+      captureFrame();
+    } else {
+      console.log("Unknown message type:", message);
+    }
+  };
+  
+const captureImageBtn = document.getElementById("captureImage");
+const capturedImage = document.getElementById("capturedImage");
+
+
+// Capture the video frame and display it as an image
+captureImageBtn.addEventListener("click", () => {
+    // Create a canvas element dynamically
+    const canvas = document.createElement("canvas");
+    canvas.width = localVideo.videoWidth;
+    canvas.height = localVideo.videoHeight;
+
+    // Draw the current frame from the video
+    const context = canvas.getContext("2d");
+    if (context) {
+        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to Base64 image
+        const imageData = canvas.toDataURL("image/png");
+
+        // Display the captured image in the <img> element
+        capturedImage.src = imageData;
+        capturedImage.style.display = "block";
+
+        console.log("Image captured:", imageData);
+
+        sendMessage({ type: "image", data: imageData });
+    } else {
+        console.error("Failed to get canvas context");
+    }
+});
+
+function captureFrame() {
+    const canvas = document.createElement("canvas");
+    canvas.width = localVideo.videoWidth;
+    canvas.height = localVideo.videoHeight;
+
+    // Draw the current frame from the video
+    const context = canvas.getContext("2d");
+    if (context) {
+        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to Base64 image
+        const imageData = canvas.toDataURL("image/png");
+
+        // Display the captured image in the <img> element
+        capturedImage.src = imageData;
+        capturedImage.style.display = "block";
+
+        console.log("Image captured:", imageData);
+
+        // Send the captured image data to the server
+        sendMessage({ type: "image", data: imageData });
+    } else {
+        console.error("Failed to get canvas context for drawing.");
+    }
+}
+
+
