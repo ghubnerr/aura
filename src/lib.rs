@@ -106,7 +106,7 @@ impl SignalingServer {
     }
 
     #[pyo3(signature = (client_id=None))]
-    fn trigger_capture(&self, client_id: Option<String>) -> PyResult<()> {
+    fn capture(&self, client_id: Option<String>) -> PyResult<()> {
         let peers = self.peers.clone();
         let rt = tokio::runtime::Runtime::new().unwrap();
 

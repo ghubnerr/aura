@@ -1,4 +1,4 @@
-const signalingSocket = new WebSocket("ws://127.0.0.1:3030/signaling");
+const signalingSocket = new WebSocket("ws://127.0.0.1:8765/signaling");
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 

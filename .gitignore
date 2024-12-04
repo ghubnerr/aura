@@ -82,5 +82,6 @@ kaggle.json
 
 *.ivf
 *.mp4
+*.png
 
 temp/

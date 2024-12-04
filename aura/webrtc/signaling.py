@@ -23,7 +23,7 @@ def capture_images(server, output_dir="captured_images"):
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    server.trigger_capture()
+    server.capture()
     
     time.sleep(2)
     
@@ -46,9 +46,12 @@ def main():
     
     print(f"Signaling server started on port {port}")
     print("Press Ctrl+C to stop the server")
+    # This will print out all methods received by py0 
+    # print(dir(server))
     
     try:
         while True:
+            time.sleep(10)
             capture_images(server)
             time.sleep(10)
     except KeyboardInterrupt:
