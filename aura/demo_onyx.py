@@ -8,12 +8,12 @@ import cv2
 import numpy as np
 
 from PIL import Image
-from aura.embed.model import EmotionModel
-from aura.dataset.t2v_model import LatteT2VideoPipeline, create_prompt
+from .embed.model import EmotionModel
+from .dataset.t2v_model import LatteT2VideoPipeline, create_prompt
 
 
 emotion_model = EmotionModel(pretrained=False)
-emotion_model.load("/path/to/aura_emotion_classifier.pth")
+emotion_model.load("output/aura_emotion_classifier.pth")
 emotion_model.eval()
 
 label_map = {0: "happy", 1: "sad", 2: "disgust", 3: "fear", 4: "anger", 5: "neutral", 6: "happy", 7: "neutral"}
@@ -43,7 +43,7 @@ async def handle_client(websocket):
     os.remove(output_path)
 
 async def main():
-    async with websockets.serve(handle_client, "", 9000):
+    async with websockets.serve(handle_client, "", 6000):
         await asyncio.Future()
 
 if __name__ == "__main__":

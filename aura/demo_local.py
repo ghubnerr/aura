@@ -17,7 +17,7 @@ async def main():
     jpg_bytes = buffer.tobytes()
     encoded_image = base64.b64encode(jpg_bytes).decode('utf-8')
 
-    uri = "ws://localhost:8888"
+    uri = "ws://localhost:6000"
     async with websockets.connect(uri) as ws:
         await ws.send(encoded_image)
         

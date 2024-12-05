@@ -43,7 +43,8 @@ class EmotionModel(nn.Module):
         return True
     
     def load(self, path: str):
-        self.load_state_dict(path)
+        state_dict = torch.load(path, weights_only=True)
+        self.load_state_dict(state_dict)
         return True
     
     def train_loop(self, provider, epochs, batch_size):
