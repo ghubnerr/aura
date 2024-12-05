@@ -91,13 +91,8 @@ def create_prompt(presentation, emotion):
     return " ".join([subject_prompt, color_prompt])
 
 if __name__ == "__main__":
-    emotions = list(refik_emotions.keys())
-    random_indices = [random.randint(0, len(emotions) - 1) for _ in range(10_000)]
-    count = 0
-    for i in random_indices:
-        count += 1
-        emotion = emotions[i]
-        prompt = " ".join([refik_prompt, refik_emotions[emotion]])
-        print(f"Generating Video #{count}, Emotion: {emotion}")
-        t2v_pipeline = LatteT2VideoPipeline(enable_pab=True, num_gpus=8)
-        t2v_pipeline(prompt, f"{STORAGE_PATH}/backdrops/refik/refik_{emotion}_{count}.mp4")
+    t2v_pipeline = LatteT2VideoPipeline(enable_pab=True)
+    for emotion, emotion_prompt in refik_emotions.items():
+        print(f"Generating {emotion}")
+        prompt = " ".join([refik_prompt, emotion_prompt])
+        t2v_pipeline(prompt, f"output/refik_{emotion}.mp4")

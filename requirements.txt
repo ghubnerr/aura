@@ -1,10 +1,10 @@
-accelerate==1.0.1
+accelerate
 accelerator==2024.9.13
 aiosignal==1.3.1
 annotated-types==0.7.0
 antlr4-python3-runtime==4.9.3
 anyio==4.6.2.post1
-asttokens @ file:///home/conda/feedstock_root/build_artifacts/asttokens_1698341106958/work
+asttokens 
 attrs==24.2.0
 av==13.1.0
 bcrypt==4.2.0
@@ -16,21 +16,21 @@ certifi==2024.8.30
 cffi==1.17.1
 charset-normalizer==3.4.0
 click==8.1.7
-colossalai==0.4.5
-comm @ file:///home/conda/feedstock_root/build_artifacts/comm_1710320294760/work
+colossalai
+comm 
 contexttimer==0.3.3
 contourpy==1.3.0
 cryptography==43.0.3
 cycler==0.12.1
-debugpy @ file:///home/conda/feedstock_root/build_artifacts/debugpy_1725269181790/work
-decorator==4.4.2
+debugpy 
+decorator
 Deprecated==1.2.14
 diffusers==0.30.0
 distro==1.9.0
 einops==0.8.0
-exceptiongroup @ file:///home/conda/feedstock_root/build_artifacts/exceptiongroup_1720869315914/work
-executing @ file:///home/conda/feedstock_root/build_artifacts/executing_1725214404607/work
-fabric==3.2.2
+exceptiongroup 
+executing 
+fabric
 filelock==3.16.1
 fonttools==4.54.1
 frozenlist==1.5.0
@@ -46,28 +46,28 @@ imageio==2.36.0
 imageio-ffmpeg==0.5.1
 importlib_metadata==8.5.0
 invoke==2.2.0
-ipykernel @ file:///home/conda/feedstock_root/build_artifacts/ipykernel_1719845459717/work
-ipython @ file:///home/conda/feedstock_root/build_artifacts/ipython_1725050136642/work
-jedi @ file:///home/conda/feedstock_root/build_artifacts/jedi_1696326070614/work
+ipykernel 
+ipython 
+jedi 
 Jinja2==3.1.4
 jiter==0.7.0
 joblib==1.4.2
 jsonschema==4.23.0
 jsonschema-specifications==2024.10.1
-jupyter_client @ file:///home/conda/feedstock_root/build_artifacts/jupyter_client_1716472197302/work
-jupyter_core @ file:///home/conda/feedstock_root/build_artifacts/jupyter_core_1710257277185/work
+jupyter_client 
+jupyter_core 
 kagglehub==0.3.4
 kiwisolver==1.4.7
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 matplotlib==3.9.2
-matplotlib-inline @ file:///home/conda/feedstock_root/build_artifacts/matplotlib-inline_1713250518406/work
+matplotlib-inline 
 maturin==1.7.1
 mdurl==0.1.2
 moviepy==1.0.3
 mpmath==1.3.0
 msgpack==1.1.0
-nest_asyncio @ file:///home/conda/feedstock_root/build_artifacts/nest-asyncio_1705850609492/work
+nest_asyncio 
 networkx==3.4.2
 ninja==1.11.1.1
 numpy==1.26.4
@@ -90,17 +90,17 @@ opencv-python==4.10.0.84
 packaging==24.1
 pandas==2.2.3
 paramiko==3.5.0
-parso @ file:///home/conda/feedstock_root/build_artifacts/parso_1712320355065/work
-pexpect @ file:///home/conda/feedstock_root/build_artifacts/pexpect_1706113125309/work
-pickleshare @ file:///home/conda/feedstock_root/build_artifacts/pickleshare_1602536217715/work
+parso 
+pexpect 
+pickleshare 
 pillow==11.0.0
-platformdirs @ file:///home/conda/feedstock_root/build_artifacts/platformdirs_1725821724470/work
+platformdirs 
 proglog==0.1.10
-prompt_toolkit @ file:///home/conda/feedstock_root/build_artifacts/prompt-toolkit_1718047967974/work
+prompt_toolkit 
 protobuf==5.28.3
 psutil==6.1.0
-ptyprocess @ file:///home/conda/feedstock_root/build_artifacts/ptyprocess_1609419310487/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl
-pure_eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_1721585709575/work
+ptyprocess 
+pure_eval 
 pycparser==2.22
 pydantic==2.9.2
 pydantic_core==2.23.4
@@ -112,7 +112,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.2
 PyYAML==6.0.2
-pyzmq @ file:///home/conda/feedstock_root/build_artifacts/pyzmq_1725430379702/work
+pyzmq 
 ray==2.38.0
 referencing==0.35.1
 regex==2024.9.11
@@ -129,18 +129,18 @@ setproctitle==1.3.3
 six==1.16.0
 sniffio==1.3.1
 soupsieve==2.6
-stack-data @ file:///home/conda/feedstock_root/build_artifacts/stack_data_1669632077133/work
+stack-data 
 sympy==1.13.1
 threadpoolctl==3.5.0
 timm==1.0.11
-tokenizers==0.20.3
+tokenizers
 tomli==2.0.1
 torch==2.5.0
 torchvision==0.20.0
-tornado @ file:///home/conda/feedstock_root/build_artifacts/tornado_1724960687225/work
+tornado 
 tqdm==4.66.6
-traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_1713535121073/work
-transformers==4.46.3
+traitlets 
+transformers
 triton==3.1.0
 typing_extensions==4.12.2
 tzdata==2024.2
