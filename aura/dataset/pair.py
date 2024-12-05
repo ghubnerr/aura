@@ -62,15 +62,11 @@ class PairsGenerator:
         image_bytes = buffer.tobytes()
 
         user_query = """
-            Your task is continue a prompt for generating a beautiful and captivating abstract art piece.
-            This piece will be described below and you will continue it's text with regards to the provided image.
-            The provided image is a person whose emotion or aura you will analyze and continue the prompt accordingly.
-            The artwork should express the person's emotion or aura and ensure the prompt isn't made too much longer.
-            Do not include any other text besides the full prompt and your continuation. Here's the prompt:
-
-            Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance.
-            """
-
+            You are a modern art prompt specialist - that is a model trained to produce prompts prompts used to generate modern art through diffusion models. You will be generating a prompt for a abstract art piece of flowing ribbons, circles, particles and overall motion highligted by different colors.
+            The prompt isn't finished and it will be up to you to fill in the rest of the prompt given it's start based on the image provided. The image represents a human reaction to the art piece and this reaction should be reflected in the art piece.
+            Continue the prompt incorporating how the art piece should look like based on the person's reaction. In other words, the art piece should represent the person's reaction.
+            This could be represented in the colors, shapes, or motion of the art piece which is up to you to decide by continuing the prompt which is up to you to decide by continuing the prompt.
+            Do not include any other text besides your continuation."""
         if service == "ollama":
             return ollama.chat(
                 model = model,
@@ -78,6 +74,9 @@ class PairsGenerator:
                     'role': 'assistant',
                     'content': user_query,
                     'images': [image_bytes]
+                }, {
+                    'role': 'user',
+                    'content': 'Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance. The painting is highlighted by'
                 }]
             )['message']['content']
 
@@ -202,5 +201,5 @@ if __name__ == "__main__":
     video_generator = OpenSoraT2VideoPipeline()
     pair_generator = PairsGenerator(provider, emotion_model, video_generator, True)
     print("Saving aura dataset pairs...")
-    response = pair_generator._generate_text_description(provider.sample(1, True)[0])
+    response = pair_generator._generate_text_description(provider.sample(6, True)[0])
     print(f"\n{response}\n")
