@@ -34,41 +34,9 @@ class LatteT2VideoPipeline():
         video = self.engine.generate(prompt, num_inference_steps = steps, **kwargs).video[0]
         self.engine.save_video(video, path)
 
-PROMPT = "An abstract background featuring clean, crisp lines and symmetrical geometric patterns in harmonious colors moving from top to bottom. Use smooth gradients and organized shapes to convey neatness and meticulous care."
+REFIK_PROMPT = "Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
 
-prompts = {
-    "well-kept": "An abstract background featuring organized leaf vines and geometric patterns in harmious colors growing and moving through the piece.",
-    "formal": "An abstract background featuring thick rectangular blocks and geometric patterns in harmious colors growing to consume the piece.",
-    "simple": "An abstract background featuring simple, crisp lines and symmetrical geometric patterns in harmious colors moving from top to bottom.",
-    "elegant": "An abstract background featuring elegant, thick marble etchings and symmetrical geometric patterns in harmious colors moving from top to bottom.",
-    "dirty": "An abstract background featuring dirty, mishaped botches but in symmetrical geometric patterns all in harmious colors growing and shrinking.",
-    "unorganized": "An abstract background featuring different shapes and lines and symmetrical geometric patterns in harmious colors moving from top to bottom.",
-    "uncaring": "An abstract background featuring a single circle centered in the painting surrounded by harmious colors moving from top to bottom."
-}
-smooth_prompt = "Use smooth gradients and organized shapes to convey neatness and meticulous care."
-
-color_prompt = "crisp lines should move quickly and have highlights of"
-colors = {
-    "happy": "gold and yellow",
-    "sad": "blue and dark purple",
-    "disgust": "green and burnt orange",
-    "fear": "purple and grey white",
-    "anger": "red and metallic orange",
-    "neutral": "tan and white"
-}
-
-icons = {
-    "well-kept": "organized vine shapes",
-    "formal": "thick rectangular blocks",
-    "simple": "crisp lines",
-    "elegant": "thick marble etchings",
-    "dirty": "mishaped blotches",
-    "unorganized": "random shapes",
-    "uncaring": "plain circle"
-}
-
-refik_prompt = "Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
-refik_emotions = {
+COLOR_INJECT = {
     "joy": "Bright yellows, oranges, and greens swirl smoothly, radiating playful energy.",
     "sadness": "Cool blues and muted purples flow in slow, melancholic waves, dotted with small, shimmering clusters that fade into shadowy depths.",
     "anger": "Fiery reds and deep blacks collide in jagged, turbulent forms, with bursts of orange and sparks of yellow erupting like molten lava.",
@@ -76,23 +44,16 @@ refik_emotions = {
     "fear": "Dark grays and ominous blacks blend with piercing whites and sharp streaks of electric blue, forming tense, jagged swirls that evoke a sense of unease and urgency."
 }
 
-def create_prompt(presentation, emotion):
-    if presentation not in prompts.keys():
-        print(f"`{presentation}` it not a valid presentation. Using default `simple` presentation.")
-        presentation = "simple"
-
-    if emotion not in colors.keys():
+def create_prompt(emotion):
+    if emotion not in COLOR_INJECT.keys():
         print(f"`{emotion}` it not a valid emotion. Using default `happy` emotion.")
         emotion = "happy"
 
-    subject_prompt = f"{prompts[presentation]} f{smooth_prompt}."
-    color_prompt = f"The {icons[presentation]} should move quickly have highlights of {colors[emotion]}."
-    
-    return " ".join([subject_prompt, color_prompt])
+    return " ".join([REFIK_PROMPT, COLOR_INJECT[emotion]])
 
 if __name__ == "__main__":
     t2v_pipeline = LatteT2VideoPipeline(enable_pab=True)
-    for emotion, emotion_prompt in refik_emotions.items():
+    for emotion, color_prompt in COLOR_INJECT.items():
         print(f"Generating {emotion}")
-        prompt = " ".join([refik_prompt, emotion_prompt])
+        prompt = " ".join([REFIK_PROMPT, color_prompt])
         t2v_pipeline(prompt, f"output/refik_{emotion}.mp4")
