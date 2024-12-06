@@ -6,7 +6,8 @@ import cv2
 
 
 async def main():
-    cap = cv2.VideoCapture(0)
+    # You might need to change this to 0 or a different number to pick the right camera
+    cap = cv2.VideoCapture(1) 
     ret, frame = cap.read()
     cap.release()
     if not ret:
