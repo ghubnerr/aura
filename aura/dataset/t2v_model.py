@@ -1,11 +1,9 @@
+import os
 from typing import *
-import random
 
 from videosys import CogVideoXConfig, VideoSysEngine, OpenSoraConfig, LatteConfig
 import torch.distributed as dist
 
-
-STORAGE_PATH = "/disk/onyx-scratch/dullo009-fall2024"
 
 class CogVideoXT2VideoPipeline():
     def __init__(self, **kwargs):
@@ -53,7 +51,9 @@ def create_prompt(emotion):
 
 if __name__ == "__main__":
     t2v_pipeline = LatteT2VideoPipeline(enable_pab=True)
+    save_dir = os.path.join(os.environ.get("STORAGE_PATH"), "video_dataset")
+    os.makedirs(save_dir, exist_ok = True)
     for emotion, color_prompt in COLOR_INJECT.items():
-        print(f"Generating {emotion}")
         prompt = " ".join([REFIK_PROMPT, color_prompt])
-        t2v_pipeline(prompt, f"output/refik_{emotion}.mp4")
+        video_dir = os.path.join(save_dir, f"refik_{emotion}.mp4")
+        t2v_pipeline(prompt, video_dir)

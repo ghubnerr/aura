@@ -10,7 +10,7 @@ import numpy as np
 CLASS_CUTOFF = 2000
 
 class DatasetProvider:
-    def __init__(self, save_dir: Union[None, str], target_size: Union[None, tuple[int, int]] = None):
+    def __init__(self, target_size: Union[None, tuple[int, int]] = None):
         self.target_size = target_size
         self.emotion_labels = {
             "happy": 0,
@@ -22,12 +22,14 @@ class DatasetProvider:
             "surprise": 6,
             "contempt": 7,
         }
-        original_dir = os.getcwd()
 
+        original_dir = os.getcwd()
         try:
+            save_dir = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "emotion_dataset")
+            os.makedirs(save_dir, exist_ok = True)
             os.chdir(save_dir)
         except:
-            print(f"Could not access to {save_dir}, saving to process directory.")
+            print(f"Could not access to aura storage, {os.environ.get("STORAGE_PATH")}, saving to process directory.")
 
         dataset_path = kagglehub.dataset_download("noamsegal/affectnet-training-data")
         os.chdir(original_dir)

@@ -1,3 +1,5 @@
+import os
+
 from PIL import Image
 import numpy as np
 import torch
@@ -38,8 +40,12 @@ class EmotionModel(nn.Module):
         return self(image)
 
     
-    def save(self, path: str):
-        torch.save(self.state_dict(), f'{path}/aura_emotion_classifier.pth')
+    def save(self, path = None):
+        if path:
+            torch.save(self.state_dict(), path)
+            return True
+        save_dir = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "aura_emotion_classifier.pth")
+        torch.save(self.state_dict(), save_dir)
         return True
     
     def load(self, path: str):

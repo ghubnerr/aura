@@ -128,7 +128,7 @@ def generate_files(images):
     print("=" * 10)
 
 if __name__ == '__main__':
-    provider = DatasetProvider("/disk/onyx-scratch/dullo009-fall2024")
+    provider = DatasetProvider()
     print("Finished downloading dataset!")
     images = provider.train.extend(provider.test)
     print(f"Length: {len(images)}")

@@ -16,7 +16,7 @@ def create_heatmap(true, pred, path):
     plt.close()
 
 if __name__ == "__main__":
-    provider = DatasetProvider("/disk/onyx-scratch/dullo009-fall2024")
+    provider = DatasetProvider()
 
     print("Training Data Distr.")
     provider.label_distr()
@@ -38,4 +38,4 @@ if __name__ == "__main__":
     model.test(provider)
     
     print("Saving model...")
-    model.save("./output")
+    model.save()

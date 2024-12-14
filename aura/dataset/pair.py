@@ -14,9 +14,15 @@ import ollama
 from .provider import DatasetProvider
 from .t2v_model import *
 
-DATASET_PATH = "/disk/onyx-scratch/dullo009-fall2024"
-
 class PairsGenerator:
+
+    DESCRIPTION_PROMPT = """You are a modern art prompt specialist, trained to create prompts for abstract art using diffusion models. Your task is to generate a detailed prompt for an abstract art piece that features flowing ribbons, dynamic circles, particles, and an overall sense of motion, all highlighted by vivid, shifting colors. The style should evoke the signature work of Anadol Refik, blending fluidity, motion, and vibrant hues.
+    The starting point for this artwork is an image representing a human reaction to the art. This emotional or psychological response should be mirrored in the visual elements of the artwork. The colors, shapes, and movement should reflect the nature of this reaction. For example, a sense of calm could be represented by gentle, slow-moving ribbons, while excitement might bring faster, more erratic motion with bursts of vibrant colors.
+    Given an image of a person and an initial starting prompt, create a better and concise prompt which reflects the person's emotion, based on the image.
+    """
+    VIDEO_PROMPT = "Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
+
+
     def __init__(self, dataset_provider: DatasetProvider, 
                  emotion_model: EmotionModel,
                  video_generator: OpenSoraT2VideoPipeline|CogVideoXT2VideoPipeline|LatteT2VideoPipeline,
@@ -46,72 +52,29 @@ class PairsGenerator:
         return image, embedding, video, text_description
     
     @staticmethod
-    def _generate_text_description(image: np.ndarray, model: str = "ollama/llama3.2-vision") -> str:
+    def _generate_text_description(image: np.ndarray, model: str = "llama3.2-vision") -> str:
         """
-        Generates a text description of the emotion image using GPT-4o Vision or Llama3.2-Vision.
+        Generates a text description of the emotion image using Ollama, by default, with the Llama3.2-Vision model.
         Wrapped in a default prompt engineered message.
         """
-
-        model_opts = model.split("/")
-        if len(model_opts) != 2 or (model_opts[0] != "ollama" and model_opts[0] != "openai"):
-            raise ValueError("`model` parameter must be in the format `service/model_name`, i.e. `ollama/llama3.2-vision`.")
-        service = model_opts[0]
-        model = model_opts[1]
 
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
 
-        user_query = """
-            You are a modern art prompt specialist - that is a model trained to produce prompts prompts used to generate modern art through diffusion models. You will be generating a prompt for a abstract art piece of flowing ribbons, circles, particles and overall motion highligted by different colors.
-            The prompt isn't finished and it will be up to you to fill in the rest of the prompt given it's start based on the image provided. The image represents a human reaction to the art piece and this reaction should be reflected in the art piece.
-            Continue the prompt incorporating how the art piece should look like based on the person's reaction. In other words, the art piece should represent the person's reaction.
-            This could be represented in the colors, shapes, or motion of the art piece which is up to you to decide by continuing the prompt which is up to you to decide by continuing the prompt.
-            Do not include any other text besides your continuation."""
-        if service == "ollama":
-            return ollama.chat(
-                model = model,
-                messages=[{
-                    'role': 'assistant',
-                    'content': user_query,
-                    'images': [image_bytes]
-                }, {
-                    'role': 'user',
-                    'content': 'Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance. The painting is highlighted by'
-                }]
-            )['message']['content']
-
-        load_dotenv()
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise Exception("OPENAI_API_KEY not provided")
-
-        openai.api_key = api_key
-        client = openai.OpenAI()
-        
-        base64_image = base64.b64encode(image_bytes).decode('utf-8')
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": user_query
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64_image}"
-                            }
-                        }
-                    ]
-                }
-            ],
-            max_tokens=4
-        )
-
-        return response.choices[0].message.content
+        return ollama.chat(
+            model = model,
+            messages=[{
+                'role': 'assistant',
+                'content': PairsGenerator.DESCRIPTION_PROMPT,
+                'images': [image_bytes]
+            }, {
+                'role': 'user',
+                'content': PairsGenerator.VIDEO_PROMPT,
+            }],
+            options = {
+                'temperature': 0
+            }
+        )['message']['content']
             
     def save_pairs(self, pair: Tuple, storage_path: str):
         """
@@ -196,10 +159,13 @@ class PairsGenerator:
             yield self.get_next_pair()
 
 if __name__ == "__main__":
-    provider = DatasetProvider(DATASET_PATH)
+    provider = DatasetProvider()
     emotion_model = EmotionModel()
     video_generator = OpenSoraT2VideoPipeline()
     pair_generator = PairsGenerator(provider, emotion_model, video_generator, True)
-    print("Saving aura dataset pairs...")
-    response = pair_generator._generate_text_description(provider.sample(6, True)[0])
+
+    print("Generating prompt...")
+    response = pair_generator._generate_text_description(provider.sample(8, True)[0])
     print(f"\n{response}\n")
+    print("Generating video...")
+    video_generator(response, f"{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4")
