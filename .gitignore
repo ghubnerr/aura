@@ -1,4 +1,7 @@
 /target
+/output
+
+.env
 
 # Environment Variables
 .env
@@ -83,3 +86,6 @@ kaggle.json
 
 *.ivf
 *.mp4
+*.png
+
+temp/

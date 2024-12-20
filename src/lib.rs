@@ -1,9 +1,13 @@
 use anyhow::Result;
+use base64::engine::general_purpose;
+use base64::Engine;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::{fs::File, io::BufReader, time::Duration};
@@ -13,7 +17,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message as TungsteniteMessag
 use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
-
+use webrtc::peer_connection::RTCPeerConnection;
+use webrtc::rtp_transceiver::rtp_codec::RTPCodecType;
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
@@ -47,12 +52,17 @@ enum SignalingMessage {
         sdp_mid: Option<String>,
         sdp_mline_index: Option<u32>,
     },
+    Image {
+        data: String, // Add image data field
+    },
+    TriggerImageCapture,
 }
 #[pyclass]
 struct SignalingServer {
     peers: Peers,
     port: u16,
-    ip: String, 
+    ip: String,
+    last_captured_image: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 #[pymethods]
@@ -64,6 +74,7 @@ impl SignalingServer {
             peers: Arc::new(Mutex::new(HashMap::new())),
             port: port.unwrap_or(3030),
             ip: ip.unwrap_or_else(|| "127.0.0.1".to_string()),
+            last_captured_image: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -72,23 +83,53 @@ impl SignalingServer {
         let peers = self.peers.clone();
         let port = self.port;
         let ip = self.ip.clone();
+        let last_captured_image = self.last_captured_image.clone();
 
-        // Run the async runtime in a separate thread
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 let signaling_route = warp::path("signaling")
                     .and(warp::ws())
                     .and(with_peers(peers.clone()))
-                    .map(|ws: warp::ws::Ws, peers| {
-                        ws.on_upgrade(move |socket| handle_connection(socket, peers))
+                    .and(warp::any().map(move || last_captured_image.clone()))
+                    .map(|ws: warp::ws::Ws, peers, last_image| {
+                        ws.on_upgrade(move |socket| handle_connection(socket, peers, last_image))
                     });
 
-                // Parse IP address from string
                 let ip_addr: std::net::IpAddr = ip.parse().expect("Invalid IP address");
                 println!("Signaling server running on ws://{}:{}/signaling", ip, port);
                 warp::serve(signaling_route).run((ip_addr, port)).await;
             });
+        });
+
+        Ok(())
+    }
+
+    #[pyo3(signature = (client_id=None))]
+    fn capture(&self, client_id: Option<String>) -> PyResult<()> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        rt.block_on(async move {
+            let peers = peers.lock().await;
+
+            match client_id {
+                Some(id) => {
+                    if let Some(client) = peers.get(&id) {
+                        if let Err(e) = trigger_image_capture(client.clone()).await {
+                            eprintln!("Error triggering capture for client {}: {}", id, e);
+                        }
+                    }
+                }
+                None => {
+                    // Trigger for all clients
+                    for (id, client) in peers.iter() {
+                        if let Err(e) = trigger_image_capture(client.clone()).await {
+                            eprintln!("Error triggering capture for client {}: {}", id, e);
+                        }
+                    }
+                }
+            }
         });
 
         Ok(())
@@ -123,6 +164,36 @@ impl SignalingServer {
 
         Ok(count)
     }
+
+    #[pyo3(text_signature = "($self)")]
+    fn get_capture<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyBytes>>> {
+        let last_image = self.last_captured_image.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let image_data = rt.block_on(async move {
+            let image = last_image.lock().await;
+            image.clone()
+        });
+
+        match image_data {
+            Some(data) => PyBytes::new_bound_with(py, data.len(), |b| {
+                b.copy_from_slice(&data);
+                Ok(())
+            })
+            .map(Some),
+            None => Ok(None),
+        }
+    }
+}
+
+async fn trigger_image_capture(
+    sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let message = serde_json::to_string(&SignalingMessage::TriggerImageCapture)?;
+    let mut sender = sender.lock().await;
+    sender.send(Message::text(message)).await?;
+    println!("Sent image capture trigger to client.");
+    Ok(())
 }
 
 fn with_peers(
@@ -131,7 +202,11 @@ fn with_peers(
     warp::any().map(move || peers.clone())
 }
 
-async fn handle_connection(ws: WebSocket, peers: Peers) {
+async fn handle_connection(
+    ws: WebSocket,
+    peers: Peers,
+    last_captured_image: Arc<Mutex<Option<Vec<u8>>>>,
+) {
     let (sender, mut receiver) = ws.split();
     let sender = Arc::new(Mutex::new(sender));
 
@@ -144,27 +219,31 @@ async fn handle_connection(ws: WebSocket, peers: Peers) {
         match result {
             Ok(msg) => {
                 if let Ok(text) = msg.to_str() {
-                    println!("Received message from {}: {}", client_id, text);
-
-                    // Attempt to parse the message
                     let signaling_message: Result<SignalingMessage, _> = serde_json::from_str(text);
                     match signaling_message {
+                        Ok(SignalingMessage::Image { data }) => {
+                            handle_image_message(data.clone()).await;
+
+                            if let Some(base64_data) = data.split(',').nth(1) {
+                                if let Ok(image_bytes) =
+                                    general_purpose::STANDARD.decode(base64_data)
+                                {
+                                    let mut last_image = last_captured_image.lock().await;
+                                    *last_image = Some(image_bytes);
+                                }
+                            }
+                        }
                         Ok(message) => {
-                            println!("Parsed message successfully: {:?}", message);
                             forward_message(&client_id, &message, &peers).await;
                         }
                         Err(e) => {
-                            eprintln!(
-                                "Error parsing message from client {}: {} - Error: {:?}",
-                                client_id, text, e
-                            );
-                            // Log and continue, but do not break the connection
+                            eprintln!("Error parsing message: {:?}", e);
                         }
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Error receiving message for client {}: {}", client_id, e);
+                eprintln!("Error receiving message: {}", e);
                 break;
             }
         }
@@ -172,6 +251,31 @@ async fn handle_connection(ws: WebSocket, peers: Peers) {
 
     peers.lock().await.remove(&client_id);
     println!("Client {} disconnected", client_id);
+}
+
+async fn handle_image_message(data: String) {
+    println!("Received image data of length: {}", data.len());
+
+    let base64_data = data.split(',').nth(1).unwrap_or("");
+    println!("Base64 content length: {}", base64_data.len());
+
+    match general_purpose::STANDARD.decode(base64_data) {
+        Ok(image_bytes) => {
+            println!(
+                "Decoded image data successfully. Bytes length: {}",
+                image_bytes.len()
+            );
+
+            if let Err(e) = tokio::fs::write("captured_image.png", &image_bytes).await {
+                eprintln!("Failed to save image: {}", e);
+            } else {
+                println!("Image saved as captured_image.png");
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to decode Base64 image data: {}", e);
+        }
+    }
 }
 
 async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Peers) {
@@ -183,7 +287,7 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-    let peers = peers.lock().await; 
+    let peers = peers.lock().await;
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
             let mut client = client.lock().await; // Await the async Mutex lock
@@ -199,6 +303,7 @@ pub struct VideoStreamer {
     ws_ip: String,
     ws_port: u16,
     ivf_dir: String,
+    peer_connection: Arc<Mutex<Option<Arc<RTCPeerConnection>>>>,
 }
 
 #[pymethods]
@@ -209,6 +314,7 @@ impl VideoStreamer {
             ws_ip,
             ws_port,
             ivf_dir,
+            peer_connection: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -216,12 +322,14 @@ impl VideoStreamer {
         let ws_ip = self.ws_ip.clone();
         let ws_port = self.ws_port;
         let ivf_dir = self.ivf_dir.clone();
+        let peer_connection_store = self.peer_connection.clone(); // Clone the peer_connection store
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
                 // Setup WebRTC and signaling
-                if let Err(e) = start_webrtc(&ws_ip, ws_port, &ivf_dir).await {
+                if let Err(e) = start_webrtc(&ws_ip, ws_port, &ivf_dir, peer_connection_store).await
+                {
                     eprintln!("Error starting WebRTC: {}", e);
                 }
             });
@@ -229,9 +337,35 @@ impl VideoStreamer {
 
         Ok(())
     }
+
+    fn take_screenshot(&self) -> PyResult<Vec<u8>> {
+        let peer_connection = self.peer_connection.clone();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            if let Some(pc) = peer_connection.lock().await.as_ref() {
+                match capture_screenshot(pc).await {
+                    Ok(screenshot) => Ok(screenshot),
+                    Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Failed to capture screenshot: {}",
+                        e
+                    ))),
+                }
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "No active peer connection",
+                ))
+            }
+        })
+    }
 }
 
-async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
+async fn start_webrtc(
+    ws_ip: &str,
+    ws_port: u16,
+    ivf_dir: &str,
+    peer_connection_store: Arc<Mutex<Option<Arc<RTCPeerConnection>>>>,
+) -> Result<()> {
     let mut m = MediaEngine::default();
     m.register_default_codecs()?;
 
@@ -252,7 +386,7 @@ async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
     };
 
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
-
+    *peer_connection_store.lock().await = Some(Arc::clone(&peer_connection));
     let video_track = Arc::new(TrackLocalStaticSample::new(
         RTCRtpCodecCapability {
             mime_type: MIME_TYPE_VP8.to_owned(),
@@ -273,7 +407,7 @@ async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
 
     // Connect to signaling server
     let (ws_stream, _) = connect_async(format!("ws://{}:{}/signaling", ws_ip, ws_port)).await?;
-    let (mut write, mut read) = ws_stream.split();
+    let (write, mut read) = ws_stream.split();
     let write = Arc::new(Mutex::new(write));
     let pc = Arc::clone(&peer_connection);
 
@@ -324,6 +458,14 @@ async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
                                 println!("Error adding ICE candidate: {}", e);
                             }
                         }
+                        SignalingMessage::Image { data: _ } => {
+                            println!("Received image message - ignoring in WebRTC context");
+                        }
+                        SignalingMessage::TriggerImageCapture => {
+                            println!(
+                                "Received trigger capture message - ignoring in WebRTC context"
+                            );
+                        }
                     }
                 }
             }
@@ -357,6 +499,42 @@ async fn write_video_to_track(path: &str, track: Arc<TrackLocalStaticSample>) ->
             .await?;
         ticker.tick().await;
     }
+}
+
+async fn capture_screenshot(peer_connection: &Arc<RTCPeerConnection>) -> Result<Vec<u8>> {
+    let transceivers = peer_connection.get_transceivers().await;
+
+    for transceiver in transceivers {
+        let receiver = transceiver.receiver().await;
+        let tracks = receiver.tracks().await;
+
+        for track in tracks {
+            if track.kind() == RTPCodecType::Video {
+                let mut buffer = vec![0u8; 1500];
+
+                let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1);
+                let tx = tx.clone();
+
+                tokio::spawn(async move {
+                    if let Ok((rtp_packet, _)) = track.read(&mut buffer).await {
+                        // Access the payload data from the RTP packet
+                        let payload = rtp_packet.payload.clone();
+                        let _ = tx.send(payload.to_vec()).await;
+                    }
+                });
+
+                if let Ok(Some(frame_data)) =
+                    tokio::time::timeout(Duration::from_secs(5), rx.recv()).await
+                {
+                    return Ok(frame_data);
+                }
+            }
+        }
+    }
+
+    Err(anyhow::Error::msg(
+        "No video track found or timeout occurred",
+    ))
 }
 
 async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSample>) -> Result<()> {
@@ -421,7 +599,7 @@ mod tests {
         assert_eq!(server.ip, "127.0.0.1");
     }
 
-    #[test] 
+    #[test]
     fn test_server_default_values() {
         let server = SignalingServer::new(None, None);
         assert_eq!(server.port, 3030);
