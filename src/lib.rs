@@ -593,7 +593,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[test]
     fn test_server_creation() {
         let server = SignalingServer::new(Some(3031), Some("127.0.0.1".to_string()));
         assert_eq!(server.port, 3031);
