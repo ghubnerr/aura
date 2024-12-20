@@ -145,7 +145,6 @@ triton==3.1.0
 typing_extensions==4.12.2
 tzdata==2024.2
 urllib3==2.2.3
-videosys @ git+https://github.com/NUS-HPC-AI-Lab/VideoSys.git@6fb859f273b7a09ee04cbb44f1a073ad1926cb90
 waitress==3.0.0
 wcwidth==0.2.13
 wrapt==1.16.0
