@@ -1,4 +1,3 @@
-import base64
 import os
 from typing import *
 
@@ -10,6 +9,8 @@ from tqdm import tqdm
 import openai
 from dotenv import load_dotenv
 import ollama
+from PIL import Image
+
 
 from .provider import DatasetProvider
 from .t2v_model import *
@@ -57,6 +58,9 @@ class PairsGenerator:
         Generates a text description of the emotion image using Ollama, by default, with the Llama3.2-Vision model.
         Wrapped in a default prompt engineered message.
         """
+        
+        if isinstance(image, Image.Image):
+            image = np.array(image)
 
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
