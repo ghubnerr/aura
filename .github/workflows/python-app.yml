@@ -32,13 +32,16 @@ jobs:
       - name: Create virtual environment
         run: python -m venv .venv
 
-      - name: Install pip
-        run: python -m ensurepip --upgrade
+      # Reinstall pip in the virtual environment
+      - name: Reinstall pip in the virtual environment
+        run: |
+          source .venv/bin/activate
+          python -m ensurepip --upgrade
+          python -m pip install --upgrade pip
 
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          python -m pip install --upgrade pip
           pip install pytest maturin
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
@@ -48,6 +51,7 @@ jobs:
           source .venv/bin/activate
           maturin develop
 
+      # Test with pytest
       - name: Test with pytest
         run: |
           source .venv/bin/activate
