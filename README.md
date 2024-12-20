@@ -1,5 +1,7 @@
 # Aura
+
 ### File Structure
+
 ```bash
 .
 ├── Cargo.lock
@@ -7,24 +9,69 @@
 ├── LICENSE
 ├── README.md
 ├── aura
+│   ├── README.md
 │   ├── __init__.py
 │   ├── aura.cpython-310-darwin.so
-│   └── tests
-│       ├── __pycache__
-│       └── test_all.py
+│   ├── camera
+│   │   ├── __init__.py
+│   │   └── processor.py
+│   ├── dataset
+│   │   ├── __init__.py
+│   │   ├── pair.py
+│   │   ├── processed_images
+│   │   ├── provider.py
+│   │   └── t2v_model.py
+│   ├── demo_local.py
+│   ├── demo_onyx.py
+│   ├── embed
+│   │   ├── __init__.py
+│   │   ├── model.py
+│   │   └── train.py
+│   ├── output
+│   │   └── aura_storage
+│   ├── pytest.ini
+│   ├── sim_clr
+│   │   ├── __init__.py
+│   │   └── embed.py
+│   ├── tests
+│   │   ├── test_pair.py
+│   │   └── test_signaling.py
+│   └── webrtc
+│       ├── __init__.py
+│       ├── signaling.py
+│       └── streamer.py
+├── docs
+│   ├── diamond.png
+│   ├── image-1.png
+│   ├── image.png
+│   ├── onyx.png
+│   └── quartz.png
 ├── notebooks
+│   ├── README.md
+│   ├── StyleGAN2_ADA_test.ipynb
+│   ├── baseline_video_gen.ipynb
+│   ├── generate_video_cogvx.py
 │   └── hello_world.ipynb
 ├── pyproject.toml
+├── requirements.linux.conda.txt
 ├── requirements.txt
+├── scripts
+│   ├── caption.py
+│   └── convert_to_ivf.sh
 ├── src
 │   └── lib.rs
-└── target
+└── ui
+    └── static
+        ├── app.js
+        └── index.html
 ```
+
 WTF is going on?
+
 - The project supports rust-built Python modules as binaries if we need to do something fast i.e. a long Regex, camera I/O, etc :)
 
-
 Where you should be working:
+
 - Python Modules: i.e. Camera input: `aura/camera/` [How to write Python modules](https://arc.net/l/quote/tmyndbro)
 - Rust Packages for fast inferencing: `src/lib.rs` (or another Rust module location inside `src`)
 - Jupyter Notebooks for AI stuff: `/notebooks`
@@ -33,7 +80,7 @@ Where you should be working:
 
 > Note: If you're developing on VSCode, download the necessary extensions to make your life easier (e.g. Jupyter Notebooks, Rust Analyzer, PyLint)
 
-In your desired project location, run: 
+In your desired project location, run:
 
 ```bash
 git clone https://github.com/ghubnerr/aura
@@ -56,6 +103,7 @@ pip install -r requirements.txt
 ```
 
 ### Using A100's for free to run our code in Colab
+
 - Follow instructions in [/notebooks](https://github.com/ghubnerr/aura/blob/main/notebooks/README.md) to connect to clusters and still run our repo.
 
 ### Running Tests
@@ -66,6 +114,7 @@ Make sure you run this prior:
 <b>Testing Rust Source Code</b>
 
 Download Rust [here](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+
 ```bash
 cargo test
 ```
@@ -73,17 +122,21 @@ cargo test
 If this doesn't work, try running:
 
 For MacOS
+
 ```bash
 export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
 ```
 
 For Linux (using `tsch`) -> `onyx` uses `tsch`
+
 ```bash
 setenv LD_LIBRARY_PATH "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
 ```
+
 - You will want to add this into your `~/.tcshrc` file (use `nano ~/.tcshrc`):
+
 ```bash
-source ~/miniconda3/etc/profile.d/conda.csh 
+source ~/miniconda3/etc/profile.d/conda.csh
 setenv PATH "${PATH}:$HOME/.cargo/bin"
 if ($?CONDA_PREFIX) then
     if ($?LD_LIBRARY_PATH) then
@@ -93,7 +146,9 @@ if ($?CONDA_PREFIX) then
     endif
 endif
 ```
+
 - If it still doesn't work, do this:
+
 ```bash
 conda activate aura
 echo $CONDA_PREFIX # make sure this works
@@ -101,16 +156,22 @@ mkdir -p $CONDA_PREFIX/etc/conda/activate.d
 touch $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
 nano $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
 ```
+
 - Write this:
+
 ```bash
 #!/bin/tcsh
 setenv LD_LIBRARY_PATH ${CONDA_PREFIX}/lib
 ```
+
 - Save it and run this:
+
 ```bash
 chmod +x $CONDA_PREFIX/etc/conda/activate.d/set_ld_library_path.csh
 ```
+
 - Now run
+
 ```bash
 conda deactivate
 conda activate aura
@@ -131,16 +192,21 @@ pytest aura/tests # (If the latter doesn't work)
 ```
 
 ### Pushing to Source
-1. Make sure you pull first 
+
+1. Make sure you pull first
+
 ```bash
 git pull
 # If there are any conflicts, use `git stash`, then `git pull`, and then `git stash pop`. Address the conflicts there using VSCode Merge Editor
 ```
+
 2. Commit your changes to a new branch
+
 ```bash
 git add .
 git commit -m "<your-message>"
 git checkout -b <your_github_name>/<your_branch_feature>
 git push -u origin <your_github_name>/<your_branch_feature>
 ```
+
 3. Create a Pull Request for your branch on GitHub

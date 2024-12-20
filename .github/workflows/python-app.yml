@@ -2,51 +2,53 @@ name: Python application
 
 on:
   push:
-    branches: [ "main", "master", "staging" ]
+    branches: ["main", "master", "staging"]
   pull_request:
-    branches: [ "main", "master", "staging" ]
+    branches: ["main", "master", "staging"]
 
 permissions:
   contents: read
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    
-    # Set up Rust toolchain for building Rust-based Python extensions with pyo3
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-    
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.10"
+      - uses: actions/checkout@v4
 
-    # Create a virtual environment
-    - name: Create virtual environment
-      run: python -m venv .venv
+      # Set up Rust toolchain for building Rust-based Python extensions with pyo3
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
-    - name: Install dependencies
-      run: |
-        source .venv/bin/activate
-        python -m pip install --upgrade pip
-        pip install pytest maturin
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
 
-    # Build the Rust extension in development mode using Maturin
-    - name: Build and install Rust extension
-      run: |
-        source .venv/bin/activate
-        maturin develop
+      # Create a virtual environment
+      - name: Create virtual environment
+        run: python -m venv .venv
 
-    - name: Test with pytest
-      run: |
-        source .venv/bin/activate
-        pytest
+      - name: Install pip
+        run: python -m ensurepip --upgrade
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install pytest maturin
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # Build the Rust extension in development mode using Maturin
+      - name: Build and install Rust extension
+        run: |
+          source .venv/bin/activate
+          maturin develop
+
+      - name: Test with pytest
+        run: |
+          source .venv/bin/activate
+          pytest
