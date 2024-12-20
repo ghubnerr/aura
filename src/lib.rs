@@ -287,8 +287,7 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-
-    let peers = peers.lock().await; 
+    let peers = peers.lock().await;
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
             let mut client = client.lock().await; // Await the async Mutex lock
@@ -593,6 +592,7 @@ fn aura(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod tests {
     use super::*;
 
+    #[test]
     #[test]
     fn test_server_creation() {
         let server = SignalingServer::new(Some(3031), Some("127.0.0.1".to_string()));

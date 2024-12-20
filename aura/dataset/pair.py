@@ -1,140 +1,80 @@
+import base64
+import os
 from typing import *
-from aura.sim_clr import SimCLR
+
+import numpy as np
+import cv2
+from aura.embed import EmotionModel
 from aura.camera import ProcessingPipeline
 from tqdm import tqdm
-from .provider import DatasetProvider
 import openai
-from PIL import Image
-import io
-import os
 from dotenv import load_dotenv
-from .t2v_model import *
-import base64
-import json
-import numpy as np
+import ollama
 
-TEMP_IMAGE_PATH = "./temp"
+from .provider import DatasetProvider
+from .t2v_model import *
 
 class PairsGenerator:
+
+    DESCRIPTION_PROMPT = """You are a modern art prompt specialist, trained to create prompts for abstract art using diffusion models. Your task is to generate a detailed prompt for an abstract art piece that features flowing ribbons, dynamic circles, particles, and an overall sense of motion, all highlighted by vivid, shifting colors. The style should evoke the signature work of Anadol Refik, blending fluidity, motion, and vibrant hues.
+    The starting point for this artwork is an image representing a human reaction to the art. This emotional or psychological response should be mirrored in the visual elements of the artwork. The colors, shapes, and movement should reflect the nature of this reaction. For example, a sense of calm could be represented by gentle, slow-moving ribbons, while excitement might bring faster, more erratic motion with bursts of vibrant colors.
+    Given an image of a person and an initial starting prompt, create a better and concise prompt which reflects the person's emotion, based on the image.
+    """
+    VIDEO_PROMPT = "Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
+
+
     def __init__(self, dataset_provider: DatasetProvider, 
-                 simclr_model: SimCLR, processing_pipeline: ProcessingPipeline, 
-                 video_generator: OpenSoraT2VideoPipeline|CogVideoXT2VideoPipeline,
+                 emotion_model: EmotionModel,
+                 video_generator: OpenSoraT2VideoPipeline|CogVideoXT2VideoPipeline|LatteT2VideoPipeline,
+                 test: bool,
                  **kwargs):
         self.dataset_provider = dataset_provider
-        self.simclr_model = simclr_model
-        self.processing_pipeline = processing_pipeline
-        self.video_generator = video_generator(**kwargs)
+        self.emotion_model = emotion_model
+        self.video_generator = video_generator
+        self.test = test
+
+        self._current_image = 0
 
     def get_next_pair(self, **kwargs) -> Tuple:
         """
         Generates the next image embedding and video pair.
         """
-        # Get an image from the dataset provider
-        image = self.dataset_provider.get_image()
+
+        image = self.dataset_provider.sample(self._current_image, test = self.test)
+        self.current_image += 1
         if image is None:
             raise StopIteration("No more images available in the dataset.")
 
-        # Generate a text description of the image using GPT-4
         text_description = self._generate_text_description(image)
-
-        # Generate a video from the text description
         video = self.video_generator(text_description, **kwargs)
+        embedding = self.emotion_model.embed(image)
 
-        # Preprocess the image using the processing pipeline
-        processed_image = self.processing_pipeline.process(image)
-
-        # Embedding for the processed image using SimCLR
-        embedding = self.simclr_model.embed(processed_image)
-
-        return embedding, video
+        return image, embedding, video, text_description
     
     @staticmethod
-    def _generate_text_description(image: Image.Image, model: str = "ollama/bakllava") -> str:
+    def _generate_text_description(image: np.ndarray, model: str = "llama3.2-vision") -> str:
         """
-        Generates a text description of the emotion image using GPT-4 Vision.
+        Generates a text description of the emotion image using Ollama, by default, with the Llama3.2-Vision model.
         Wrapped in a default prompt engineered message.
         """
-        # Convert PIL image to base64
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-        user_query = """
-            Look at this image carefully and analyze the person's facial expression.
-            What emotion is being displayed?
-            Respond with 1-3 emotion-related words only (e.g., 'happy', 'sad', 'angry', etc.).
-            Do not include percentages or technical details.
-            """
+        _, buffer = cv2.imencode('.jpg', image)
+        image_bytes = buffer.tobytes()
 
-        if model.startswith("ollama"):
-            import requests
-            
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": model.split("/")[1],
-                    "prompt": user_query,
-                    "images": [base64_image],
-                    "stream": False
-                }
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"Error from Ollama API: {response.text}")
-            
-            responses = [json.loads(line) for line in response.text.strip().split('\n')]        
-            
-            final_response = ""
-            for resp in responses:
-                if "response" in resp:
-                    final_response += resp["response"]
-                if "error" in resp:
-                    print(f"Error in response: {resp['error']}")
-            
-            model_response = final_response.strip()
-            
-            if not model_response:
-                raise Exception("Empty response from Ollama")
-                        
-            return model_response
-
-        else: # OPENAI_API_KEY-based model i.e. "gpt-4-vision-preview"
-            load_dotenv()
-            api_key = os.getenv("OPENAI_API_KEY")
-
-            if not api_key:
-                raise Exception("OPENAI_API_KEY not provided")
-
-            openai.api_key = api_key
-
-            client = openai.OpenAI()
-            
-            response = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": user_query
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=4
-            )
-
-            model_response = response.choices[0].message.content
-                    
-        return f"Abstract art with swirls, curves, color, light, synesthesia, and shapes \
-                 which represent the following emotion or idea: {model_response}"
+        return ollama.chat(
+            model = model,
+            messages=[{
+                'role': 'assistant',
+                'content': PairsGenerator.DESCRIPTION_PROMPT,
+                'images': [image_bytes]
+            }, {
+                'role': 'user',
+                'content': PairsGenerator.VIDEO_PROMPT,
+            }],
+            options = {
+                'temperature': 0
+            }
+        )['message']['content']
             
     def save_pairs(self, pair: Tuple, storage_path: str):
         """
@@ -146,22 +86,31 @@ class PairsGenerator:
                         - or Hugging Face dataset - hf://).
         """
 
-        embedding, video = pair
+        image, embedding, video, text_description = pair
+        id = hash(image)
 
         if storage_path.startswith("local://"):
             local_path = storage_path.replace("local://", "")
             os.makedirs(local_path, exist_ok=True)  
 
-            file_id = f"{hash(tuple(embedding))}_{len(video)}"
-            embedding_path = os.path.join(local_path, f"embedding_{file_id}.npy")
-            video_path = os.path.join(local_path, f"video_{file_id}.mp4")
+            folder = os.path.join(local_path, id)
+            os.makedirs(folder)
 
+            image_path = os.path.join(folder, f"image_{id}.jpg")
+            cv2.imwrite(image_path, image)
+
+            description_path = os.path.join(folder, f"description_{id}.txt")
+            with open(description_path, "w") as file:
+                file.write(text_description)
+
+            embedding_path = os.path.join(folder, f"embedding_{id}.npy")
             with open(embedding_path, "wb") as f:
                 np.save(f, embedding)
 
+            video_path = os.path.join(local_path, f"video_{id}.mp4")
             with open(video_path, "wb") as f:
                 f.write(video)
-
+            
             print(f"Pair saved locally: {embedding_path}, {video_path}")
 
         elif storage_path.startswith("hf://"):
@@ -170,9 +119,11 @@ class PairsGenerator:
             dataset_name = storage_path.replace("hf://", "")
             huggingface_hub.login()
 
-            from datasets import Dataset
+            from dataset import Dataset
             
             data = {
+                "image": image,
+                "description": text_description,
                 "embedding": [embedding.tolist()],  
                 "video": [video], 
             }
@@ -184,9 +135,9 @@ class PairsGenerator:
                 _ = Dataset.load_from_disk(existing_dataset)
 
                 # Check for duplicates based on embedding and video hash
-                new_data = dataset.filter(lambda x: hash(tuple(x["embedding"])) != hash(tuple(embedding)))
+                new_data = dataset.filter(lambda x: hash(x["image"]) != hash(image))
                 if len(new_data) < len(dataset):
-                    print(f"Duplicate detected, skipping save for pair: {file_id}")
+                    print(f"Duplicate detected, skipping save for pair: {id}")
                     return
 
             dataset.push_to_hub(dataset_name)
@@ -207,4 +158,14 @@ class PairsGenerator:
         for _ in tqdm(range(count), desc="Generating pairs"):
             yield self.get_next_pair()
 
+if __name__ == "__main__":
+    provider = DatasetProvider()
+    emotion_model = EmotionModel()
+    video_generator = OpenSoraT2VideoPipeline()
+    pair_generator = PairsGenerator(provider, emotion_model, video_generator, True)
 
+    print("Generating prompt...")
+    response = pair_generator._generate_text_description(provider.sample(8, True)[0])
+    print(f"\n{response}\n")
+    print("Generating video...")
+    video_generator(response, f"{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4")
