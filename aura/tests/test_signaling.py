@@ -2,7 +2,10 @@ import pytest
 import asyncio
 import websockets
 import json
-from aura import SignalingServer
+from aura.webrtc import SignalingServer
+import sys
+print(sys.path)
+
 import time
 
 @pytest.fixture(scope="function")

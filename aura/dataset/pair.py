@@ -168,4 +168,4 @@ if __name__ == "__main__":
     response = pair_generator._generate_text_description(provider.sample(8, True)[0])
     print(f"\n{response}\n")
     print("Generating video...")
-    video_generator(response, f"{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4")
+    video_generator(response, f'{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4')

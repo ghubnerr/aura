@@ -29,7 +29,7 @@ class DatasetProvider:
             os.makedirs(save_dir, exist_ok = True)
             os.chdir(save_dir)
         except:
-            print(f"Could not access to aura storage, {os.environ.get("STORAGE_PATH")}, saving to process directory.")
+            print(f"Could not access to aura storage, {os.environ.get('STORAGE_PATH')}, saving to process directory.")
 
         dataset_path = kagglehub.dataset_download("noamsegal/affectnet-training-data")
         os.chdir(original_dir)
