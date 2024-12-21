@@ -12,10 +12,10 @@
 <div align="center">
   <table>
     <tr>
-      <td><img src="docs/aura_test_anger_art_slowed.gif" alt="Anger" width="200"></td>
-      <td><img src="docs/aura_test_joy_art_slowed.gif" alt="Joy" width="200"></td>
-      <td><img src="docs/aura_test_lust_art_slowed.gif" alt="Lust" width="200"></td>
-      <td><img src="docs/aura_test_sadness_art_slowed.gif" alt="Sadness" width="200"></td>
+      <td><img src="docs/aura_test_anger_art_slowed.gif" alt="Anger" width="150"></td>
+      <td><img src="docs/aura_test_joy_art_slowed.gif" alt="Joy" width="150"></td>
+      <td><img src="docs/aura_test_lust_art_slowed.gif" alt="Lust" width="150"></td>
+      <td><img src="docs/aura_test_sadness_art_slowed.gif" alt="Sadness" width="150"></td>
     </tr>
     <tr>
       <td align="center"><b>Anger</b></td>
