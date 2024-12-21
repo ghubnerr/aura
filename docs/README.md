@@ -1,79 +1,12 @@
-# Aura
-
-### File Structure
-
-```bash
-.
-├── Cargo.lock
-├── Cargo.toml
-├── LICENSE
-├── README.md
-├── aura
-│   ├── README.md
-│   ├── __init__.py
-│   ├── aura.cpython-310-darwin.so
-│   ├── camera
-│   │   ├── __init__.py
-│   │   └── processor.py
-│   ├── dataset
-│   │   ├── __init__.py
-│   │   ├── pair.py
-│   │   ├── processed_images
-│   │   ├── provider.py
-│   │   └── t2v_model.py
-│   ├── demo_local.py
-│   ├── demo_onyx.py
-│   ├── embed
-│   │   ├── __init__.py
-│   │   ├── model.py
-│   │   └── train.py
-│   ├── output
-│   │   └── aura_storage
-│   ├── pytest.ini
-│   ├── sim_clr
-│   │   ├── __init__.py
-│   │   └── embed.py
-│   ├── tests
-│   │   ├── test_pair.py
-│   │   └── test_signaling.py
-│   └── webrtc
-│       ├── __init__.py
-│       ├── signaling.py
-│       └── streamer.py
-├── docs
-│   ├── diamond.png
-│   ├── image-1.png
-│   ├── image.png
-│   ├── onyx.png
-│   └── quartz.png
-├── notebooks
-│   ├── README.md
-│   ├── StyleGAN2_ADA_test.ipynb
-│   ├── baseline_video_gen.ipynb
-│   ├── generate_video_cogvx.py
-│   └── hello_world.ipynb
-├── pyproject.toml
-├── requirements.linux.conda.txt
-├── requirements.txt
-├── scripts
-│   ├── caption.py
-│   └── convert_to_ivf.sh
-├── src
-│   └── lib.rs
-└── ui
-    └── static
-        ├── app.js
-        └── index.html
-```
-
-WTF is going on?
+# Aura Documentation
 
 - The project supports rust-built Python modules as binaries if we need to do something fast i.e. a long Regex, camera I/O, etc :)
+- To see details about running `notebooks`, visit [`/notebooks`](../notebooks/README.md)
 
 Where you should be working:
 
 - Python Modules: i.e. Camera input: `aura/camera/` [How to write Python modules](https://arc.net/l/quote/tmyndbro)
-- Rust Packages for fast inferencing: `src/lib.rs` (or another Rust module location inside `src`)
+- Rust Packages for fast I/O and streaming: `src/lib.rs` (or another Rust module location inside `src`)
 - Jupyter Notebooks for AI stuff: `/notebooks`
 
 ## Development
