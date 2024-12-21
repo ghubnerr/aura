@@ -69,7 +69,7 @@ git clone https://github.com/ghubnerr/aura
 cd aura
 ```
 
-Initiate your conda environment. To donwload Anaconda and manage your Python environments, go [here](https://www.anaconda.com/download). Here we're using Python 3.10
+Initiate your conda environment. To download Anaconda and manage your Python environments, go [here](https://www.anaconda.com/download). Here we're using Python 3.10
 
 ```bash
 conda create -n aura python=3.10
