@@ -1,82 +1,64 @@
-# Aura
+<div align="center">
+  <h1 align="center">🎆 Aura</h1>
+  <h3>Aligning AI Art with Emotion, in Real Time</h3>
+</div>
 
-### File Structure
+<div align="center" id="badges">
+  <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-4F4F4F?style=flat&logo=pytorch&logoColor=%23EE4C2C"> <img alt="Rust" src="https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=%23FFFFFF"> <img alt="WebRTC" src="https://img.shields.io/badge/WebRTC-4D4D4D?logo=webrtc"> <img alt="Python" src="https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=FED901"> <img alt="Jupyter" src="https://img.shields.io/badge/Jupyter-gray?logo=jupyter">
+</div>
 
-```bash
-.
-├── Cargo.lock
-├── Cargo.toml
-├── LICENSE
-├── README.md
-├── aura
-│   ├── README.md
-│   ├── __init__.py
-│   ├── aura.cpython-310-darwin.so
-│   ├── camera
-│   │   ├── __init__.py
-│   │   └── processor.py
-│   ├── dataset
-│   │   ├── __init__.py
-│   │   ├── pair.py
-│   │   ├── processed_images
-│   │   ├── provider.py
-│   │   └── t2v_model.py
-│   ├── demo_local.py
-│   ├── demo_onyx.py
-│   ├── embed
-│   │   ├── __init__.py
-│   │   ├── model.py
-│   │   └── train.py
-│   ├── output
-│   │   └── aura_storage
-│   ├── pytest.ini
-│   ├── sim_clr
-│   │   ├── __init__.py
-│   │   └── embed.py
-│   ├── tests
-│   │   ├── test_pair.py
-│   │   └── test_signaling.py
-│   └── webrtc
-│       ├── __init__.py
-│       ├── signaling.py
-│       └── streamer.py
-├── docs
-│   ├── diamond.png
-│   ├── image-1.png
-│   ├── image.png
-│   ├── onyx.png
-│   └── quartz.png
-├── notebooks
-│   ├── README.md
-│   ├── StyleGAN2_ADA_test.ipynb
-│   ├── baseline_video_gen.ipynb
-│   ├── generate_video_cogvx.py
-│   └── hello_world.ipynb
-├── pyproject.toml
-├── requirements.linux.conda.txt
-├── requirements.txt
-├── scripts
-│   ├── caption.py
-│   └── convert_to_ivf.sh
-├── src
-│   └── lib.rs
-└── ui
-    └── static
-        ├── app.js
-        └── index.html
-```
+<br>
 
-WTF is going on?
+<div align="center">
+  <table>
+    <tr>
+      <td><img src="docs/aura_test_anger_art_slowed.gif" alt="Anger" width="150"></td>
+      <td><img src="docs/aura_test_joy_art_slowed.gif" alt="Joy" width="150"></td>
+      <td><img src="docs/aura_test_lust_art_slowed.gif" alt="Lust" width="150"></td>
+      <td><img src="docs/aura_test_sadness_art_slowed.gif" alt="Sadness" width="150"></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Anger</b></td>
+      <td align="center"><b>Joy</b></td>
+      <td align="center"><b>Lust</b></td>
+      <td align="center"><b>Sadness</b></td>
+    </tr>
+  </table>
+</div>
+
+> **Aura is a live GAN-based video generator that supports the alignment of someone's emotion (or Aura) with its artistic representation. It uses [StyleGAN-V](https://github.com/universome/stylegan-v)'s model with a [CLIP](https://github.com/openai/CLIP)-like representation of emotion-video pairs to perform interpolations between latents given a new input emotion and the current art state. We've also developed a WebRTC pipeline in Rust to stream model outputs and camera inputs in real time between your browser and your GPUs :)**
+
+## How it Works
+
+<div align="center">
+  <img src="docs/aura.png" alt="Landscape" style="width:100%;">
+</div>
+
+## Progress So Far
+- [ ] Host UI on a website
+- [ ] Create CLIP-based script for StyleGAN-V interpolations
+- [ ] Generate Pairs of Embeddings and Videos with OpenSora and store on a large enough storage
+- [ ] Implement Queueing System in Python and in the UI
+- [ ] Create model endpoint to receive screen captures
+- [x] Create Ollama pipeline to generate video prompts to OpenSora
+- [x] Design an image processing pipeline to remove unfairness
+- [x] Find an emotion classification dataset
+- [x] Create Emotion Classifier Encoder CNN
+- [x] Allow screen-capture so that it can be sent to the model
+- [x] Create WebRTC renegotiation pipeline in Rust 
+
+## How to Contribute
 
 - The project supports rust-built Python modules as binaries if we need to do something fast i.e. a long Regex, camera I/O, etc :)
+- To see details about running `notebooks`, visit [`/notebooks`](../notebooks/README.md)
 
 Where you should be working:
 
 - Python Modules: i.e. Camera input: `aura/camera/` [How to write Python modules](https://arc.net/l/quote/tmyndbro)
-- Rust Packages for fast inferencing: `src/lib.rs` (or another Rust module location inside `src`)
+- Rust Packages for fast I/O and streaming: `src/lib.rs` (or another Rust module location inside `src`)
 - Jupyter Notebooks for AI stuff: `/notebooks`
 
-## Development
+### Development
 
 > Note: If you're developing on VSCode, download the necessary extensions to make your life easier (e.g. Jupyter Notebooks, Rust Analyzer, PyLint)
 
@@ -102,7 +84,7 @@ Installing Python Dependencies
 pip install -r requirements.txt
 ```
 
-### Using A100's for free to run our code in Colab
+### Using A100's for free to run our code in Colab (FIU Students Only)
 
 - Follow instructions in [/notebooks](https://github.com/ghubnerr/aura/blob/main/notebooks/README.md) to connect to clusters and still run our repo.
 
@@ -127,7 +109,7 @@ For MacOS
 export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
 ```
 
-For Linux (using `tsch`) -> `onyx` uses `tsch`
+For Linux (using `tsch`) -> `onyx` (FIU Server) uses `tsch`
 
 ```bash
 setenv LD_LIBRARY_PATH "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
