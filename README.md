@@ -26,13 +26,26 @@
   </table>
 </div>
 
-> **Aura is a live GAN-based video generator that supports the alignment of someone's emotion (or aura) with its artistic representation. It uses [StyleGAN-V](https://github.com/universome/stylegan-v)'s model with a [CLIP](https://github.com/openai/CLIP)-like representation of emotion-video pairs to perform interpolations between latents given a new input emotion. We've developed a WebRTC pipeline in Rust to stream model outputs and camera inputs in real time between your browser and your GPUs.**
+> **Aura is a live GAN-based video generator that supports the alignment of someone's emotion (or Aura) with its artistic representation. It uses [StyleGAN-V](https://github.com/universome/stylegan-v)'s model with a [CLIP](https://github.com/openai/CLIP)-like representation of emotion-video pairs to perform interpolations between latents given a new input emotion and the current art state. We've also developed a WebRTC pipeline in Rust to stream model outputs and camera inputs in real time between your browser and your GPUs :)**
 
 ## How it Works
 
 <div align="center">
   <img src="docs/aura.png" alt="Landscape" style="width:100%;">
 </div>
+
+## Progress So Far
+- [ ] Host UI on a website
+- [ ] Create CLIP-based script for StyleGAN-V interpolations
+- [ ] Generate Pairs of Embeddings and Videos with OpenSora and store on a large enough storage
+- [ ] Implement Queueing System in Python and in the UI
+- [ ] Create model endpoint to receive screen captures
+- [x] Create Ollama pipeline to generate video prompts to OpenSora
+- [x] Design an image processing pipeline to remove unfairness
+- [x] Find an emotion classification dataset
+- [x] Create Emotion Classifier Encoder CNN
+- [x] Allow screen-capture so that it can be sent to the model
+- [x] Create WebRTC renegotiation pipeline in Rust 
 
 ## How to Contribute
 
@@ -71,7 +84,7 @@ Installing Python Dependencies
 pip install -r requirements.txt
 ```
 
-### Using A100's for free to run our code in Colab
+### Using A100's for free to run our code in Colab (FIU Students Only)
 
 - Follow instructions in [/notebooks](https://github.com/ghubnerr/aura/blob/main/notebooks/README.md) to connect to clusters and still run our repo.
 
@@ -96,7 +109,7 @@ For MacOS
 export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
 ```
 
-For Linux (using `tsch`) -> `onyx` uses `tsch`
+For Linux (using `tsch`) -> `onyx` (FIU Server) uses `tsch`
 
 ```bash
 setenv LD_LIBRARY_PATH "$CONDA_PREFIX/lib:$LD_LIBRARY_PATH"
