@@ -5,6 +5,7 @@ import numpy as np
 import logging
 from datetime import datetime
 import time
+import argparse
 
 class FaceNotFoundException(Exception):
     """Exception raised when no face is detected in an image."""
@@ -30,6 +31,8 @@ class ProcessingPipeline:
         
         self.log_path: str = log_path
         self.verbose: int = verbose
+        
+        # https://medium.com/analytics-vidhya/haar-cascades-explained-38210e57970d
         self.face_cascade: cv2.CascadeClassifier = cv2.CascadeClassifier(
             cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         )
@@ -46,7 +49,7 @@ class ProcessingPipeline:
         
         if self.verbose == 2:
             logging.basicConfig(
-                filename=os.path.join(self.current_log_dir, 'processing.log'),
+                filename=os.path.join(self.log_path, f'{timestamp}.log'),
                 level=logging.INFO,
                 format='%(asctime)s - %(message)s'
             )
@@ -119,33 +122,64 @@ class ProcessingPipeline:
     
     def process_image(self, image: np.ndarray) -> np.ndarray:
         """
-        Extract, resize, and normalize the largest face in an image.
+        Extract, resize, and normalize the largest face in an image for CNN processing.
         
         Args:
             image: Input image array
             
         Returns:
-            48x48 normalized grayscale face image
+            224x224 normalized image with 3 channels (RGB)
             
         Raises:
             FaceNotFoundException: If no face is detected in the image
         """
         start_time: float = time.time()
-        gray: np.ndarray = self._convert_to_gray(image)
-        bbox: Optional[Tuple[int, int, int, int]] = self.get_bounding_box(gray)
+        bbox: Optional[Tuple[int, int, int, int]] = self.get_bounding_box(image)
         
         if bbox is None:
             raise FaceNotFoundException()
         
         x, y, w, h = bbox
-        face: np.ndarray = gray[y:y+h, x:x+w]
-        face = cv2.resize(face, (48, 48))
+        face: np.ndarray = image[y:y+h, x:x+w]  
+        face = cv2.resize(face, (224, 224))     # Resize to CNN input
+        
         face = face.astype(np.float32) / 255.0
         
+        face = np.transpose(face, (2, 0, 1))
+        
         if self.verbose > 0:
-            self._save_to_log_path((face * 255).astype(np.uint8), "processed.jpg")
+            self._save_to_log_path((face * 255).transpose(1, 2, 0).astype(np.uint8), "processed.jpg")
         
         if self.verbose == 2:
             logging.info(f"Image processing took {time.time() - start_time:.2f} seconds")
         
         return face
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process and annotate an image to detect faces.")
+    parser.add_argument("image_path", type=str, help="Path to the input image")
+    parser.add_argument("--log_path", type=str, default="./logs", help="Directory to store logs and outputs")
+    
+    args = parser.parse_args()
+    
+    if not os.path.isfile(args.image_path):
+        print(f"Error: The file '{args.image_path}' does not exist.")
+        exit(1)
+    
+    pipeline = ProcessingPipeline(log_path=args.log_path, verbose=2)
+    
+    image = cv2.imread(args.image_path)
+    if image is None:
+        print(f"Error: Unable to read the image at '{args.image_path}'. Ensure the file is a valid image.")
+        exit(1)
+    
+    try:
+        annotated_image = pipeline.annotate_face(image)
+        
+        output_path = os.path.join(pipeline.current_log_dir or args.log_path, "bbox.jpg")
+        cv2.imwrite(output_path, annotated_image)
+        
+        print(f"Annotated image saved at '{output_path}'")
+    except FaceNotFoundException as e:
+        print(e)

@@ -62,11 +62,15 @@ def test_annotation(pipeline, image_with_face):
 
 def test_image_processing_with_face(pipeline, image_with_face):
     processed = pipeline.process_image(image_with_face)
-    assert processed.shape == (48, 48)
-    assert processed.dtype == np.float32
-    assert 0 <= processed.min() <= processed.max() <= 1
-    log_files = list(Path(pipeline.current_log_dir).glob("processed.jpg"))
-    assert len(log_files) == 1
+    
+    assert processed.shape == (3, 224, 224), f"Unexpected shape: {processed.shape}"
+    assert processed.dtype == np.float32, f"Unexpected dtype: {processed.dtype}"
+    assert 0 <= processed.min() <= processed.max() <= 1, "Pixel values not normalized to [0, 1]"
+    
+    if pipeline.verbose > 0:
+        log_files = list(Path(pipeline.current_log_dir).glob("processed.jpg"))
+        assert len(log_files) == 1, "Processed image log not found"
+
 
 def test_image_processing_without_face(pipeline, image_without_face):
     with pytest.raises(FaceNotFoundException):
