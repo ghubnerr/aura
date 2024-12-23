@@ -3,7 +3,10 @@ from aura import SignalingServer
 import sys
 import signal
 import time
+from camera import ProcessingPipeline, FaceNotFoundException
 import os
+import numpy as np
+import cv2
 from datetime import datetime
 
 def get_free_port():
@@ -17,22 +20,35 @@ def signal_handler(sig, frame):
     print("\nShutting down signaling server...")
     sys.exit(0)
 
-def capture_images(server, output_dir="captured_images"):
-    """Trigger image capture for all peers and save images"""
+def capture_images(server, output_dir="../logs", verbose=2):
+    """Capture, process, and save images with face detection"""
     os.makedirs(output_dir, exist_ok=True)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # For logging purposes
+    
+    pipeline = ProcessingPipeline(
+        log_path=output_dir,
+        verbose=verbose
+    )
     
     server.capture()
-    
     time.sleep(2)
     
     image_bytes = server.get_capture()
     if image_bytes:
-        filename = os.path.join(output_dir, f"capture_{timestamp}.png")
-        with open(filename, "wb") as f:
-            f.write(image_bytes)
-        print(f"Image saved to {filename}")
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        try:        
+            annotated_image = pipeline.annotate_face(image)
+            processed_face = pipeline.process_image(image)
+            
+            # TODO: Send processed face to the model 
+            
+        except FaceNotFoundException:
+            print(f"No face detected in captured image.")
+        except Exception as e:
+            print(f"Error processing image: {str(e)}")
     else:
         print("No image captured")
 
@@ -46,8 +62,6 @@ def main():
     
     print(f"Signaling server started on port {port}")
     print("Press Ctrl+C to stop the server")
-    # This will print out all methods received by py0 
-    # print(dir(server))
     
     try:
         while True:

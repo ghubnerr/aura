@@ -88,3 +88,5 @@ kaggle.json
 *.mp4
 
 temp/
+
+logs/
