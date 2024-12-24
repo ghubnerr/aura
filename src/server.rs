@@ -7,6 +7,7 @@ use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
+use pyo3::Python;
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -30,6 +31,9 @@ pub struct SignalingServer {
 impl SignalingServer {
     #[new]
     #[pyo3(signature = (port=None, ip=None))]
+    #[pyo3(
+        text_signature = "(self, port: Optional[int] = None, ip: Optional[str] = None) -> SignalingServer"
+    )]
     pub fn new(port: Option<u16>, ip: Option<String>) -> Self {
         SignalingServer {
             peers: Arc::new(Mutex::new(HashMap::new())),
@@ -67,6 +71,7 @@ impl SignalingServer {
     }
 
     #[pyo3(signature = (client_id=None))]
+    #[pyo3(text_signature = "(self, client_id: Optional[str] = None) -> None")]
     pub fn capture(&self, client_id: Option<String>) -> PyResult<()> {
         let peers = self.peers.clone();
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -95,9 +100,78 @@ impl SignalingServer {
 
         Ok(())
     }
+    #[pyo3(text_signature = "(self, client_id: str, message: str) -> bool")]
+    pub fn send_to_client(&self, client_id: String, message: String) -> PyResult<bool> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
 
-    /// Send a message to all connected peers
-    #[pyo3(text_signature = "($self, message)")]
+        let result = rt.block_on(async move {
+            if let Some(client) = peers.lock().await.get(&client_id) {
+                let mut client = client.lock().await;
+                client.send(Message::text(message)).await.is_ok()
+            } else {
+                false
+            }
+        });
+
+        Ok(result)
+    }
+
+    #[pyo3(text_signature = "(self, client_id: str) -> bool")]
+    pub fn is_client_connected(&self, client_id: String) -> PyResult<bool> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let is_connected = rt.block_on(async move { peers.lock().await.contains_key(&client_id) });
+
+        Ok(is_connected)
+    }
+
+    #[pyo3(text_signature = "(self) -> List[str]")]
+    pub fn get_connected_clients(&self) -> PyResult<Vec<String>> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let clients = rt.block_on(async move { peers.lock().await.keys().cloned().collect() });
+
+        Ok(clients)
+    }
+
+    #[pyo3(text_signature = "(self, client_id: str) -> bool")]
+    pub fn disconnect_client(&self, client_id: String) -> PyResult<bool> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let was_removed =
+            rt.block_on(async move { peers.lock().await.remove(&client_id).is_some() });
+
+        Ok(was_removed)
+    }
+
+    #[pyo3(text_signature = "(self) -> bool")]
+    pub fn is_at_capacity(&self) -> PyResult<bool> {
+        Python::with_gil(|py| {
+            let count = self.get_client_count(py)?;
+            Ok(count >= 2)
+        })
+    }
+
+    #[pyo3(text_signature = "(self) -> int")]
+    pub fn get_server_status(&self) -> PyResult<HashMap<String, String>> {
+        let peers = self.peers.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let mut status = HashMap::new();
+        status.insert("ip".to_string(), self.ip.clone());
+        status.insert("port".to_string(), self.port.to_string());
+
+        let client_count = rt.block_on(async move { peers.lock().await.len().to_string() });
+        status.insert("connected_clients".to_string(), client_count);
+
+        Ok(status)
+    }
+
+    #[pyo3(text_signature = "(self, message: str) -> None")]
     pub fn broadcast_message(&self, message: String, _py: Python<'_>) -> PyResult<()> {
         let peers = self.peers.clone();
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -115,7 +189,6 @@ impl SignalingServer {
         Ok(())
     }
 
-    /// Get the number of connected clients
     #[pyo3(text_signature = "($self)")]
     pub fn get_client_count(&self, _py: Python<'_>) -> PyResult<usize> {
         let peers = self.peers.clone();
@@ -126,7 +199,7 @@ impl SignalingServer {
         Ok(count)
     }
 
-    #[pyo3(text_signature = "($self)")]
+    #[pyo3(text_signature = "(self) -> Optional[bytes]")]
     pub fn get_capture<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyBytes>>> {
         let last_image = self.last_captured_image.clone();
         let rt = tokio::runtime::Runtime::new().unwrap();

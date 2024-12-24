@@ -39,6 +39,7 @@ pub struct VideoStreamer {
 
 #[pymethods]
 impl VideoStreamer {
+    #[pyo3(text_signature = "(self, ws_ip: str, ws_port: int, ivf_dir: str) -> VideoStreamer")]
     #[new]
     fn new(ws_ip: String, ws_port: u16, ivf_dir: String) -> Self {
         VideoStreamer {
@@ -49,11 +50,12 @@ impl VideoStreamer {
         }
     }
 
+    #[pyo3(text_signature = "(self) -> None")]
     fn start_streaming(&self) -> PyResult<()> {
         let ws_ip = self.ws_ip.clone();
         let ws_port = self.ws_port;
         let ivf_dir = self.ivf_dir.clone();
-        let peer_connection_store = self.peer_connection.clone(); // Clone the peer_connection store
+        let peer_connection_store = self.peer_connection.clone();
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -69,6 +71,7 @@ impl VideoStreamer {
         Ok(())
     }
 
+    #[pyo3(text_signature = "(self) -> bytes")]
     fn take_screenshot(&self) -> PyResult<Vec<u8>> {
         let peer_connection = self.peer_connection.clone();
 
@@ -82,6 +85,83 @@ impl VideoStreamer {
                         e
                     ))),
                 }
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "No active peer connection",
+                ))
+            }
+        })
+    }
+
+    #[pyo3(text_signature = "(self) -> str")]
+    fn get_connection_state(&self) -> PyResult<String> {
+        let peer_connection = self.peer_connection.clone();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            if let Some(pc) = peer_connection.lock().await.as_ref() {
+                Ok(pc.connection_state().to_string())
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "No active peer connection",
+                ))
+            }
+        })
+    }
+
+    #[pyo3(text_signature = "(self) -> str")]
+    fn get_signaling_state(&self) -> PyResult<String> {
+        let peer_connection = self.peer_connection.clone();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            if let Some(pc) = peer_connection.lock().await.as_ref() {
+                Ok(pc.signaling_state().to_string())
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "No active peer connection",
+                ))
+            }
+        })
+    }
+
+    #[pyo3(text_signature = "(self) -> str")]
+    fn get_stats(&self) -> PyResult<String> {
+        let peer_connection = self.peer_connection.clone();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            if let Some(pc) = peer_connection.lock().await.as_ref() {
+                let stats = pc.get_stats().await;
+                match serde_json::to_string(&stats) {
+                    Ok(stats_string) => Ok(stats_string),
+                    Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Failed to serialize stats: {}",
+                        e
+                    ))),
+                }
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "No active peer connection",
+                ))
+            }
+        })
+    }
+
+    #[pyo3(text_signature = "(self) -> None")]
+    fn close_connection(&self) -> PyResult<()> {
+        let peer_connection = self.peer_connection.clone();
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async move {
+            if let Some(pc) = peer_connection.lock().await.as_ref() {
+                if let Err(e) = pc.close().await {
+                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Failed to close connection: {}",
+                        e
+                    )));
+                }
+                Ok(())
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
                     "No active peer connection",
