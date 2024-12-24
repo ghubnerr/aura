@@ -4,7 +4,6 @@ import websockets
 import json
 from aura.webrtc import SignalingServer
 import sys
-print(sys.path)
 
 import time
 
@@ -62,7 +61,6 @@ async def test_client_connection(signaling_server, unused_tcp_port):
 
     uri = f'ws://localhost:{unused_tcp_port}/signaling'
     async with websockets.connect(uri) as websocket:
-        # Wait briefly for connection to be registered
         await asyncio.sleep(0.1)
         assert signaling_server.get_client_count() == 1
 
@@ -72,10 +70,8 @@ async def test_signaling_message_exchange(signaling_server, unused_tcp_port):
     uri = f'ws://localhost:{unused_tcp_port}/signaling'
     
     async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
-        # Wait for connections to be established
         await asyncio.sleep(0.1)
         
-        # Test SDP offer exchange
         offer_message = {
             "type": "offer",
             "sdp": "test_sdp_offer"
@@ -94,16 +90,82 @@ async def test_broadcast_message(signaling_server, unused_tcp_port):
     uri = f'ws://localhost:{unused_tcp_port}/signaling'
     
     async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
-        # Wait for connections to be established
         await asyncio.sleep(0.1)
         
         test_message = "broadcast test message"
         signaling_server.broadcast_message(test_message)
         
-        # Both clients should receive the message
         msg1 = await client1.recv()
         msg2 = await client2.recv()
         
         assert msg1 == test_message
         assert msg2 == test_message
 
+@pytest.mark.asyncio
+async def test_disconnect_client(signaling_server, unused_tcp_port):
+    """Test disconnecting a client"""
+    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    
+    async with websockets.connect(uri) as client:
+        await asyncio.sleep(0.1)
+        
+        connected_clients = signaling_server.get_connected_clients()
+        assert len(connected_clients) == 1
+        client_id = connected_clients[0]
+        
+        assert signaling_server.disconnect_client(client_id) == True
+        await asyncio.sleep(0.1)
+        
+        assert signaling_server.get_client_count() == 0
+        assert signaling_server.disconnect_client(client_id) == False
+
+@pytest.mark.asyncio
+async def test_send_to_client(signaling_server, unused_tcp_port):
+    """Test sending messages to specific clients"""
+    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    
+    async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
+        await asyncio.sleep(0.1)
+        
+        clients = signaling_server.get_connected_clients()
+        client_id = clients[0]
+        
+        test_message = "test message"
+        assert signaling_server.send_to_client(client_id, test_message) == True
+        
+        assert signaling_server.send_to_client("invalid_id", test_message) == False
+        
+        received_msg = await client1.recv()
+        assert received_msg == test_message
+
+@pytest.mark.asyncio
+async def test_server_status(signaling_server, unused_tcp_port):
+    """Test server status information"""
+    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    
+    status = signaling_server.get_server_status()
+    assert isinstance(status, dict)
+    assert "ip" in status
+    assert "port" in status
+    assert "connected_clients" in status
+    assert status["port"] == str(unused_tcp_port)
+    
+    async with websockets.connect(uri) as client:
+        await asyncio.sleep(0.1)
+        updated_status = signaling_server.get_server_status()
+        assert updated_status["connected_clients"] == "1"
+
+@pytest.mark.asyncio
+async def test_client_capacity(signaling_server, unused_tcp_port):
+    """Test server capacity handling"""
+    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    
+    assert signaling_server.is_at_capacity() == False
+    
+    async with websockets.connect(uri) as client1:
+        await asyncio.sleep(0.1)
+        assert signaling_server.is_at_capacity() == False
+        
+        async with websockets.connect(uri) as client2:
+            await asyncio.sleep(0.1)
+            assert signaling_server.is_at_capacity() == True
