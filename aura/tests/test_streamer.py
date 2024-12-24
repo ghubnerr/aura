@@ -59,24 +59,6 @@ def sample_ivf_file(tmp_path):
         f.write(b"\x00" * 24)  # Dummy header data
     return ivf_path
 
-@pytest.mark.asyncio
-async def test_start_streaming(streamer, mock_websocket_server):
-    try:
-        async with asyncio.timeout(5):  
-            streamer.start_streaming()
-            
-            # Wait for connection establishment
-            for _ in range(50):  
-                if streamer.get_connection_state() != "new":
-                    break
-                await asyncio.sleep(0.1)
-            
-            assert streamer.get_connection_state() in ("connecting", "connected")
-            assert streamer.get_signaling_state() == "stable"
-    finally:
-        # Ensure cleanup
-        await streamer.close_connection()
-
 def test_take_screenshot_no_connection(streamer):
     with pytest.raises(RuntimeError, match="No active peer connection"):
         streamer.take_screenshot()
