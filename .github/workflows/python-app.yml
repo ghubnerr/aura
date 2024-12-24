@@ -43,8 +43,15 @@ jobs:
       - name: Build and install Rust extension
         run: |
           source .venv/bin/activate
-          export VIRTUAL_ENV=$(python -c 'import sys; print(sys.base_prefix)')
           maturin develop
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD/aura" >> $GITHUB_ENV
+
+      - name: Verify aura installation
+        run: |
+          source .venv/bin/activate
+          python -c "import aura"
 
       - name: Test with pytest
         run: |
