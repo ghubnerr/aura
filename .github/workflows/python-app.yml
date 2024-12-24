@@ -43,6 +43,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install pytest maturin
+          pip install git+https://github.com/NUS-HPC-AI-Lab/VideoSys.git
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       # Build the Rust extension in development mode using Maturin
