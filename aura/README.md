@@ -12,5 +12,5 @@ python -m webrtc.streamer
 ### Testing (make sure you're inside `./aura`)
 
 ```
-pytest
+pytest <optional: your test file path>
 ```
