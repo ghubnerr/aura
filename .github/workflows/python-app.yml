@@ -16,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Set up Rust toolchain for building Rust-based Python extensions with pyo3
       - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -24,36 +23,19 @@ jobs:
           override: true
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
-      # Create a virtual environment
-      - name: Create virtual environment
-        run: python -m venv .venv
-
-      # Reinstall pip in the virtual environment
-      - name: Reinstall pip in the virtual environment
-        run: |
-          source .venv/bin/activate
-          python -m ensurepip --upgrade
-          python -m pip install --upgrade pip
+          cache: "pip"
 
       - name: Install dependencies
         run: |
-          source .venv/bin/activate
-          pip install pytest maturin
-          pip install git+https://github.com/NUS-HPC-AI-Lab/VideoSys.git
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install pytest maturin
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt --no-build-isolation; fi
 
-      # Build the Rust extension in development mode using Maturin
       - name: Build and install Rust extension
-        run: |
-          source .venv/bin/activate
-          maturin develop
+        run: maturin develop
 
-      # Test with pytest
       - name: Test with pytest
-        run: |
-          source .venv/bin/activate
-          pytest
+        run: pytest
