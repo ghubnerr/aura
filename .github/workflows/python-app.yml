@@ -38,15 +38,19 @@ jobs:
         run: |
           source .venv/bin/activate
           python -m pip install pytest maturin
+          python -m pip install -e .
           if [ -f requirements.txt ]; then python -m pip install -r requirements.txt --no-build-isolation; fi
 
       - name: Build and install Rust extension
         run: |
           source .venv/bin/activate
+          export VIRTUAL_ENV=$(python -c 'import sys; print(sys.base_prefix)')
           maturin develop
 
       - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$PWD/aura" >> $GITHUB_ENV
+        run: |
+          source .venv/bin/activate
+          echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
       - name: Verify aura installation
         run: |
