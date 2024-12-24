@@ -1,6 +1,7 @@
 import socket
-from aura import SignalingServer
+from aura import SignalingServer, VideoStreamer
 import sys
+import socket
 import signal
 import time
 from camera import ProcessingPipeline, FaceNotFoundException
@@ -8,6 +9,7 @@ import os
 import numpy as np
 import cv2
 from datetime import datetime
+
 
 def get_free_port():
     """Get an unused TCP port."""
@@ -72,5 +74,6 @@ def main():
         print("\nShutting down signaling server...")
 
 if __name__ == "__main__":
-    main()
+    help(SignalingServer)
+    help(VideoStreamer)
     

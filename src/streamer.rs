@@ -151,7 +151,6 @@ impl VideoStreamer {
     #[pyo3(text_signature = "(self) -> None")]
     fn close_connection(&self) -> PyResult<()> {
         let peer_connection = self.peer_connection.clone();
-
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async move {
             if let Some(pc) = peer_connection.lock().await.as_ref() {
@@ -161,6 +160,7 @@ impl VideoStreamer {
                         e
                     )));
                 }
+                *peer_connection.lock().await = None;
                 Ok(())
             } else {
                 Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
