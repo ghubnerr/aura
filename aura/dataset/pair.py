@@ -3,7 +3,7 @@ from typing import *
 
 import numpy as np
 import cv2
-from aura.embed import EmotionModel
+from aura.cnn import EmotionModel
 from aura.camera import ProcessingPipeline
 from tqdm import tqdm
 import openai
