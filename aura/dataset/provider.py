@@ -10,7 +10,7 @@ import numpy as np
 CLASS_CUTOFF = 2000
 
 class DatasetProvider:
-    def __init__(self, target_size: Union[None, tuple[int, int]] = None):
+    def __init__(self, target_size: Union[None, tuple[int, int]] = None, augment: bool = False):
         self.target_size = target_size
         self.emotion_labels = {
             "happy": 0,
@@ -34,21 +34,21 @@ class DatasetProvider:
         dataset_path = kagglehub.dataset_download("noamsegal/affectnet-training-data")
         os.chdir(original_dir)
 
-        dataset = self._collect_files(dataset_path)
+        dataset = self._collect_files(dataset_path, augment)
 
         train_size = int(len(dataset) * .8)
 
         self.train = dataset[:train_size]
         self.test = dataset[train_size:]
 
-    def sample(self, index: int, test: bool) -> tuple[np.ndarray, int]:
+    def sample(self, index: int, test: bool) -> tuple[np.ndarray, int, str]:
         """
-        Returns an image and it's respective label given an index
+        Returns an image, its respective label, and emotion given an index
         """
         dataset = self.test if test else self.train
         if index >= len(dataset):
-            raise ValueError(f"The `index` provided of value {index} is larger than the length of `self.image_paths`, {len(self.image_paths)}")
-
+            raise ValueError(f"The index provided of value {index} is larger than the length of dataset, {len(dataset)}")
+        
         return dataset[index]
 
     def get_next_image_batch(self, batch_size: int, test: bool):
@@ -79,7 +79,7 @@ class DatasetProvider:
             raise ValueError(f"Path, {path}, is not in proper format to parse emotion")
         return dirs[-2]
 
-    def _collect_files(self, path: str) -> List[str]:
+    def _collect_files(self, path: str, augment: bool = False) -> List[str]:
         dataset = []
         label_counter = defaultdict(int)
         for dirpath, _, filenames in os.walk(path):
@@ -94,12 +94,15 @@ class DatasetProvider:
                 
                 label = self.emotion_labels[emotion]
                 img = cv2.imread(img_path)
-                rot_img = self._random_rotation(img)
-                flip_img = self._flip(img)
-                bright_img = self._random_brightness(img)
-                # zoom_img = self._random_zoom(img)
 
-                mods = [img, rot_img, flip_img, bright_img]
+                if augment:
+                    rot_img = self._random_rotation(img)
+                    flip_img = self._flip(img)
+                    bright_img = self._random_brightness(img)
+                    mods = [img, rot_img, flip_img, bright_img]
+                else:
+                    mods = [img]
+
                 for mod in mods:
                     dataset.append((mod, label, emotion))
 

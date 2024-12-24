@@ -24,7 +24,7 @@ def capture_images(server, output_dir="../logs", verbose=2):
     """Capture, process, and save images with face detection"""
     os.makedirs(output_dir, exist_ok=True)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # For logging purposes
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
     
     pipeline = ProcessingPipeline(
         log_path=output_dir,

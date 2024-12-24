@@ -90,3 +90,5 @@ kaggle.json
 temp/
 
 logs/
+
+aura/cnn/checkpoints/
