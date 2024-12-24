@@ -7,7 +7,6 @@ use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
-use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
