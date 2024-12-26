@@ -92,7 +92,7 @@ class DatasetProvider:
             raise ValueError(f"Path, {path}, is not in proper format to parse emotion")
         return dirs[-2]
 
-    def _collect_files(self, path: str, augment: bool = False) -> List[str]:
+    def _collect_files(self, path: str, augment: bool = False) -> List[tuple[np.ndarray, int, str]]:
         dataset = []
         label_counter = defaultdict(int)
         for dirpath, _, filenames in os.walk(path):
