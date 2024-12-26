@@ -66,7 +66,7 @@ class EmotionModel(nn.Module):
             correct = 0
             total = 0
 
-            batch_iterator = tqdm(provider.get_next_image_batch(batch_size, False), desc=f'Epoch {epoch+1}/{epochs}', unit=' # batch')
+            batch_iterator = tqdm(provider.get_next_image_batch(batch_size, source = "train"), desc=f'Epoch {epoch+1}/{epochs}', unit=' # batch')
             for batch in batch_iterator:
                 images = []
                 labels = []
@@ -119,7 +119,7 @@ class EmotionModel(nn.Module):
             true_labels = []
             pred_labels = []
 
-            for batch in provider.get_next_image_batch(len(provider.test), test=True):
+            for batch in provider.get_next_image_batch(len(provider.test), source = "test"):
                 images = []
                 labels = []
                 for image, label, _ in batch:

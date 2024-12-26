@@ -16,7 +16,7 @@ def create_heatmap(true, pred, path):
     plt.close()
 
 if __name__ == "__main__":
-    provider = DatasetProvider()
+    provider = DatasetProvider(augment = True, split = 0.7)
 
     print("Training Data Distr.")
     provider.label_distr()

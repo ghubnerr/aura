@@ -27,12 +27,10 @@ class PairsGenerator:
     def __init__(self, dataset_provider: DatasetProvider, 
                  emotion_model: EmotionModel,
                  video_generator: OpenSoraT2VideoPipeline|CogVideoXT2VideoPipeline|LatteT2VideoPipeline,
-                 test: bool,
                  **kwargs):
         self.dataset_provider = dataset_provider
         self.emotion_model = emotion_model
         self.video_generator = video_generator
-        self.test = test
 
         self._current_image = 0
 
@@ -41,7 +39,7 @@ class PairsGenerator:
         Generates the next image embedding and video pair.
         """
 
-        image = self.dataset_provider.sample(self._current_image, test = self.test)
+        image = self.dataset_provider.sample(self._current_image)
         self.current_image += 1
         if image is None:
             raise StopIteration("No more images available in the dataset.")
