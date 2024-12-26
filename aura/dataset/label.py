@@ -8,7 +8,7 @@ class ImageLabeler:
     def __init__(self, root, provider):
         self.root = root
         self.provider = provider
-        self.image_iter = iter(provider.train)
+        self.image_iter = iter(provider.dataset)
         self.panel = tk.Label(root)
         self.panel.pack()
         self.label_entry = tk.Entry(root)
@@ -19,8 +19,8 @@ class ImageLabeler:
 
     def show_next_image(self):
         try:
-            img_path = next(self.image_iter)
-            img = Image.open(img_path)
+            img, _, emotion = next(self.image_iter)
+            img = Image.fromarray(img)
             img = img.resize((250, 250), Image.ANTIALIAS)
             img_tk = ImageTk.PhotoImage(img)
             self.panel.config(image=img_tk)
