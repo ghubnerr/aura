@@ -1,11 +1,13 @@
 use pyo3::prelude::*;
 
+mod queue;
 mod server;
 mod signaling_types;
 pub use signaling_types::SignalingMessage;
 
 mod streamer;
 
+use queue::QueueManager;
 use server::SignalingServer;
 use streamer::VideoStreamer;
 
@@ -13,6 +15,7 @@ use streamer::VideoStreamer;
 fn aura(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SignalingServer>()?;
     m.add_class::<VideoStreamer>()?;
+    m.add_class::<QueueManager>()?;
     Ok(())
 }
 
