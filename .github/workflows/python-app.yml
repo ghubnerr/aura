@@ -60,4 +60,4 @@ jobs:
       - name: Test with pytest
         run: |
           source .venv/bin/activate
-          pytest
+          pytest -v
