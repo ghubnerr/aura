@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageTk
 
 from aura.dataset import DatasetProvider
+from aura.utils import hash_image
 
 
 class ImageLabeler:
@@ -33,7 +34,7 @@ class ImageLabeler:
     def show_next_image(self):
         try:
             orig_img, _, emotion = next(self.image_iter)
-            img_hash = ImageLabeler._hash_image(orig_img)
+            img_hash = hash_image(orig_img)
             self.emotion_label.config(text = f"Hash: '{img_hash}', Emotion: {emotion.capitalize()}")
             img = Image.fromarray(orig_img[:, :, ::-1]) # Flipping channels (the last dimension) from 'BGR' -> 'RGB'
             img = img.resize((400, 400))
@@ -49,13 +50,6 @@ class ImageLabeler:
         print(f"Label: {label}")
         self.label_entry.delete(0, tk.END)
         self.show_next_image()
-    
-    @staticmethod
-    def _hash_image(img: np.ndarray, length: int = 10) -> str:
-        arr_bytes = img.tobytes()
-        sha1_hash = hashlib.sha1(arr_bytes).digest()  # SHA-1 produces a 20-byte hash
-        base32_encoded = base64.b32encode(sha1_hash).decode('utf-8')
-        return base32_encoded[:length]
     
     @staticmethod
     def _save_image(hash: str, caption: str):
