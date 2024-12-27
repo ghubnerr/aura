@@ -22,7 +22,7 @@ def signaling_server(unused_tcp_port):
 
     async def is_server_ready():
         uri = f'ws://localhost:{unused_tcp_port}/signaling'
-        for _ in range(10): 
+        for _ in range(10):
             try:
                 async with websockets.connect(uri):
                     return True  
@@ -30,8 +30,11 @@ def signaling_server(unused_tcp_port):
                 await asyncio.sleep(0.1)  
         return False 
 
-    if not asyncio.run(is_server_ready()):
-        raise RuntimeError("Server did not start in time")
+    async def wait_for_server():
+        return await asyncio.wait_for(is_server_ready(), timeout=30.0)
+
+    if not asyncio.run(wait_for_server()):
+        raise RuntimeError("Server did not start within the timeout period")
 
     yield server
 
