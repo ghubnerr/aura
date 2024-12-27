@@ -1,26 +1,28 @@
 import os
 from typing import *
+import base64
+from io import BytesIO
 
 import numpy as np
 import cv2
 from aura.cnn import EmotionModel
 from aura.camera import ProcessingPipeline
 from tqdm import tqdm
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 import ollama
 from PIL import Image
 
 
+from aura.utils import hash_image
 from .provider import DatasetProvider
 from .t2v_model import *
 
 class PairsGenerator:
 
-    DESCRIPTION_PROMPT = """You are a modern art prompt specialist, trained to create prompts for abstract art using diffusion models. Your task is to generate a detailed prompt for an abstract art piece that features flowing ribbons, dynamic circles, particles, and an overall sense of motion, all highlighted by vivid, shifting colors. The style should evoke the signature work of Anadol Refik, blending fluidity, motion, and vibrant hues.
-    The starting point for this artwork is an image representing a human reaction to the art. This emotional or psychological response should be mirrored in the visual elements of the artwork. The colors, shapes, and movement should reflect the nature of this reaction. For example, a sense of calm could be represented by gentle, slow-moving ribbons, while excitement might bring faster, more erratic motion with bursts of vibrant colors.
-    Given an image of a person and an initial starting prompt, create a better and concise prompt which reflects the person's emotion, based on the image.
-    """
+    CAPTION_PROMPT = """Your task is to fill in the following prompt which will be used in a video generation model. The video generation should create a video which represents the aura of the following person and the video should be art in the style of Refik Anadol. Keep your response short and concise, focusing on the emotions displayed by the person and their abstract "aura". Think about how the video should look if it were to reflect the person's emotions or reaction. Provide the provided prompt found below continued by your addition - keep your addition concise, but DO NOT PROVIDE ANY OTHER TEXT. YOUR RESPONSE WILL BE AUTOMATICALLY SUPPLIED TO ANOTHER MODEL.
+    Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."""
+
     VIDEO_PROMPT = "Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
 
 
@@ -31,6 +33,7 @@ class PairsGenerator:
         self.dataset_provider = dataset_provider
         self.emotion_model = emotion_model
         self.video_generator = video_generator
+        self.openai_client = OpenAI()
 
         self._current_image = 0
 
@@ -44,14 +47,13 @@ class PairsGenerator:
         if image is None:
             raise StopIteration("No more images available in the dataset.")
 
-        text_description = self._generate_text_description(image)
+        text_description = self._generate_text_description(image, True)
         video = self.video_generator(text_description, **kwargs)
         embedding = self.emotion_model.embed(image)
 
         return image, embedding, video, text_description
     
-    @staticmethod
-    def _generate_text_description(image: np.ndarray, model: str = "llama3.2-vision") -> str:
+    def _generate_text_description(self, image: np.ndarray, use_openai: bool = False) -> str:
         """
         Generates a text description of the emotion image using Ollama, by default, with the Llama3.2-Vision model.
         Wrapped in a default prompt engineered message.
@@ -63,8 +65,27 @@ class PairsGenerator:
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
 
+        if use_openai:
+            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": PairsGenerator.CAPTION_PROMPT},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                    ]
+                }
+            ]
+
+            response = self.openai_client.chat.completions.create(
+                model= "gpt-4o-mini",
+                messages=messages,
+            )
+
+            return response.choices[0].message.content
+
         return ollama.chat(
-            model = model,
+            model = "llama3.2-vision",
             messages=[{
                 'role': 'assistant',
                 'content': PairsGenerator.DESCRIPTION_PROMPT,
@@ -89,7 +110,7 @@ class PairsGenerator:
         """
 
         image, embedding, video, text_description = pair
-        id = hash(image)
+        id = hash_image(image)
 
         if storage_path.startswith("local://"):
             local_path = storage_path.replace("local://", "")
@@ -98,18 +119,18 @@ class PairsGenerator:
             folder = os.path.join(local_path, id)
             os.makedirs(folder)
 
-            image_path = os.path.join(folder, f"image_{id}.jpg")
+            image_path = os.path.join(folder, "face.jpg")
             cv2.imwrite(image_path, image)
 
-            description_path = os.path.join(folder, f"description_{id}.txt")
+            description_path = os.path.join(folder, "caption.txt")
             with open(description_path, "w") as file:
                 file.write(text_description)
 
-            embedding_path = os.path.join(folder, f"embedding_{id}.npy")
+            embedding_path = os.path.join(folder, "embedding.npy")
             with open(embedding_path, "wb") as f:
                 np.save(f, embedding)
 
-            video_path = os.path.join(local_path, f"video_{id}.mp4")
+            video_path = os.path.join(local_path, "video.mp4")
             with open(video_path, "wb") as f:
                 f.write(video)
             
@@ -166,8 +187,4 @@ if __name__ == "__main__":
     video_generator = OpenSoraT2VideoPipeline()
     pair_generator = PairsGenerator(provider, emotion_model, video_generator, True)
 
-    print("Generating prompt...")
-    response = pair_generator._generate_text_description(provider.sample(8, True)[0])
-    print(f"\n{response}\n")
-    print("Generating video...")
-    video_generator(response, f'{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4')
+    pair_generator.generate_and_save_pairs(5, 'local://{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4')
