@@ -132,6 +132,7 @@ async def test_disconnect_client(signaling_server, unused_tcp_port):
         assert signaling_server.get_client_count() == 0
         assert signaling_server.disconnect_client(client_id) == False
 
+@pytest.mark.timeout(10)  
 @pytest.mark.asyncio
 async def test_send_to_client(signaling_server, unused_tcp_port):
     """Test sending messages to specific clients"""
