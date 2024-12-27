@@ -2,7 +2,7 @@ import socket
 import sys
 import signal
 import time
-from aura import VideoStreamer
+from ..webrtc import VideoStreamer
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""

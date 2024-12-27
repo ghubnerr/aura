@@ -19,7 +19,7 @@ use warp::Filter;
 
 pub type Peers = Arc<Mutex<HashMap<String, Arc<Mutex<SplitSink<WebSocket, Message>>>>>>;
 
-#[pyclass]
+#[pyclass(subclass)]
 pub struct SignalingServer {
     pub peers: Peers,
     pub port: u16,

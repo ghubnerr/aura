@@ -29,7 +29,7 @@ use webrtc::{
     track::track_local::{track_local_static_sample::TrackLocalStaticSample, TrackLocal},
 };
 
-#[pyclass]
+#[pyclass(subclass)]
 pub struct VideoStreamer {
     ws_ip: String,
     ws_port: u16,

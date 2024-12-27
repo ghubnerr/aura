@@ -1,5 +1,5 @@
 import socket
-from aura import SignalingServer, VideoStreamer
+from ..webrtc import SignalingServer
 import sys
 import socket
 import signal
@@ -74,6 +74,4 @@ def main():
         print("\nShutting down signaling server...")
 
 if __name__ == "__main__":
-    help(SignalingServer)
-    help(VideoStreamer)
-    
+    main()    
