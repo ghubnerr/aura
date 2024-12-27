@@ -12,13 +12,13 @@ def test_queue_initialization(queue_manager):
     assert queue_manager.max_reconnect_attempts == 3
 
 def test_add_to_queue(queue_manager):
-    position = queue_manager.add_to_queue("user1", Priority.normal())
+    position = queue_manager.add_to_queue("user1", Priority.NORMAL)
     assert position == 1
 
 def test_priority_ordering(queue_manager):
-    queue_manager.add_to_queue("user1", Priority.normal())
-    queue_manager.add_to_queue("user2", Priority.high())
-    queue_manager.add_to_queue("user3", Priority.low())
+    queue_manager.add_to_queue("user1", Priority.NORMAL)
+    queue_manager.add_to_queue("user2", Priority.HIGH)
+    queue_manager.add_to_queue("user3", Priority.LOW)
     
     queue_list = list(queue_manager.queue)
     assert queue_list[0].id == "user2"  # High priority first
