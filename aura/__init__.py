@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 
 from aura.aura import SignalingServer, VideoStreamer
-
 load_dotenv()
 if not os.environ.get("STORAGE_PATH"):
     os.makedirs("output", exist_ok=True)
