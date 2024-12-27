@@ -19,10 +19,21 @@ def unused_tcp_port():
 def signaling_server(unused_tcp_port):
     server = SignalingServer(port=unused_tcp_port)
     server.start()
-    # Allow some time for the server to start
-    time.sleep(1)
+
+    async def is_server_ready():
+        uri = f'ws://localhost:{unused_tcp_port}/signaling'
+        for _ in range(10): 
+            try:
+                async with websockets.connect(uri):
+                    return True  
+            except (ConnectionRefusedError, OSError):
+                await asyncio.sleep(0.1)  
+        return False 
+
+    if not asyncio.run(is_server_ready()):
+        raise RuntimeError("Server did not start in time")
+
     yield server
-    # No explicit cleanup needed as the server runs in a separate thread
 
 @pytest.fixture
 async def websocket_clients(signaling_server, unused_tcp_port):
@@ -35,7 +46,6 @@ async def websocket_clients(signaling_server, unused_tcp_port):
         client2 = await websockets.connect(uri)
         yield client1, client2
     finally:
-        # Cleanup
         if client1:
             await client1.close()
         if client2:
