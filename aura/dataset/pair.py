@@ -1,22 +1,21 @@
 import os
+import shutil
 from typing import *
 import base64
-from io import BytesIO
 
+import torch
 import numpy as np
 import cv2
 from aura.cnn import EmotionModel
-from aura.camera import ProcessingPipeline
 from tqdm import tqdm
 from openai import OpenAI
-from dotenv import load_dotenv
 import ollama
 from PIL import Image
 
-
 from aura.utils import hash_image
-from .provider import DatasetProvider
-from .t2v_model import *
+from aura.dataset.provider import DatasetProvider
+from aura.dataset.t2v_model import *
+
 
 class PairsGenerator:
 
@@ -37,30 +36,18 @@ class PairsGenerator:
 
         self._current_image = 0
 
-    def get_next_pair(self, **kwargs) -> Tuple:
-        """
-        Generates the next image embedding and video pair.
-        """
+        self.dataset_path = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "emotion_dataset")
+        os.makedirs(self.dataset_path, exist_ok = True)
 
-        image = self.dataset_provider.sample(self._current_image)
-        self.current_image += 1
-        if image is None:
-            raise StopIteration("No more images available in the dataset.")
-
-        text_description = self._generate_text_description(image, True)
-        video = self.video_generator(text_description, **kwargs)
-        embedding = self.emotion_model.embed(image)
-
-        return image, embedding, video, text_description
-    
-    def _generate_text_description(self, image: np.ndarray, use_openai: bool = False) -> str:
+    def _generate_caption(self, image: np.ndarray, use_openai: bool = False) -> str:
         """
         Generates a text description of the emotion image using Ollama, by default, with the Llama3.2-Vision model.
         Wrapped in a default prompt engineered message.
         """
         
         if isinstance(image, Image.Image):
-            image = np.array(image)
+            print("Converting to continguous array")
+            image = np.ascontiguousarray(image, dtype=np.uint8)
 
         _, buffer = cv2.imencode('.jpg', image)
         image_bytes = buffer.tobytes()
@@ -99,7 +86,7 @@ class PairsGenerator:
             }
         )['message']['content']
             
-    def save_pairs(self, pair: Tuple, storage_path: str):
+    def _save_to_hf(self, image: np.ndarray, caption: str, embedding: torch.Tensor, video_path: str):
         """
         Saves the generated pairs to a specified storage location.
 
@@ -108,83 +95,89 @@ class PairsGenerator:
         - storage_path: Path to the storage location (local - local:// \
                         - or Hugging Face dataset - hf://).
         """
+        import huggingface_hub
+        huggingface_hub.login()
 
-        image, embedding, video, text_description = pair
-        id = hash_image(image)
+        from dataset import Dataset
+        
+        data = {
+            "image": image,
+            "description": caption,
+            "embedding": [embedding.detach().numpy().tolist()],  
+            # TODO: Read Video from `video_path` and save to huggingface
+            "video": [video], 
+        }
+        dataset = Dataset.from_dict(data)
 
-        if storage_path.startswith("local://"):
-            local_path = storage_path.replace("local://", "")
-            os.makedirs(local_path, exist_ok=True)  
+        # Handle duplicate avoidance using unique identifiers
+        existing_dataset = huggingface_hub.hf_hub_download(dataset_name, "pairs")
+        if existing_dataset:
+            _ = Dataset.load_from_disk(existing_dataset)
 
-            folder = os.path.join(local_path, id)
-            os.makedirs(folder)
+            # Check for duplicates based on embedding and video hash
+            new_data = dataset.filter(lambda x: hash(x["image"]) != hash(image))
+            if len(new_data) < len(dataset):
+                print(f"Duplicate detected, skipping save for pair: {id}")
+                return
 
-            image_path = os.path.join(folder, "face.jpg")
+        dataset.push_to_hub(dataset_name)
+        print(f"Pair saved to Hugging Face dataset: {dataset_name}")
+
+    def save_pairs(self, count: int, huggingface: bool = False):
+        for image, caption, embedding in self.generate_pairs(count):
+
+            img_hash = hash_image(image)
+            video_path = os.path.join(self.dataset_path, img_hash, "video.mp4")
+            self.video_generator(caption, path = video_path, aspect_ratio = "1:1", num_frames = "16s", resolution = "480p")
+
+            if huggingface:
+                self._save_to_hf(image, caption, embedding)
+                continue
+
+            image_path = os.path.join(self.dataset_path, img_hash, "face.jpg")
             cv2.imwrite(image_path, image)
 
-            description_path = os.path.join(folder, "caption.txt")
+            description_path = os.path.join(self.dataset_path, img_hash, "caption.txt")
             with open(description_path, "w") as file:
-                file.write(text_description)
+                file.write(caption)
 
-            embedding_path = os.path.join(folder, "embedding.npy")
+            embedding_path = os.path.join(self.dataset_path, img_hash, "embedding.npy")
             with open(embedding_path, "wb") as f:
-                np.save(f, embedding)
+                np.save(f, embedding.detach().numpy())
 
-            video_path = os.path.join(local_path, "video.mp4")
-            with open(video_path, "wb") as f:
-                f.write(video)
-            
-            print(f"Pair saved locally: {embedding_path}, {video_path}")
 
-        elif storage_path.startswith("hf://"):
-            import huggingface_hub
-
-            dataset_name = storage_path.replace("hf://", "")
-            huggingface_hub.login()
-
-            from dataset import Dataset
-            
-            data = {
-                "image": image,
-                "description": text_description,
-                "embedding": [embedding.tolist()],  
-                "video": [video], 
-            }
-            dataset = Dataset.from_dict(data)
-
-            # Handle duplicate avoidance using unique identifiers
-            existing_dataset = huggingface_hub.hf_hub_download(dataset_name, "pairs")
-            if existing_dataset:
-                _ = Dataset.load_from_disk(existing_dataset)
-
-                # Check for duplicates based on embedding and video hash
-                new_data = dataset.filter(lambda x: hash(x["image"]) != hash(image))
-                if len(new_data) < len(dataset):
-                    print(f"Duplicate detected, skipping save for pair: {id}")
-                    return
-
-            dataset.push_to_hub(dataset_name)
-            print(f"Pair saved to Hugging Face dataset: {dataset_name}")
-
-    def generate_and_save_pairs(self, count: int, storage_path: str):
+    def generate_pairs(self, count: int):
         """
         Generates and saves a specified number of pairs to a given path.
         """
         for _ in tqdm(range(count), desc="Generating pairs"):
-            pair = self.get_next_pair()
-            self.save_pairs(pair, storage_path)
+            image, _, _ = self.dataset_provider.sample(self._current_image)
+            self._current_image += 1
+            if image is None:
+                raise StopIteration("No more images available in the dataset.")
 
-    def generate_and_yield_pairs(self, count: int) -> Iterator[Tuple]:
-        """
-        Generates and yields a specified number of pairs.      
-        """
-        for _ in tqdm(range(count), desc="Generating pairs"):
-            yield self.get_next_pair()
+            img_hash = hash_image(image)
+            folder_path = os.path.join(self.dataset_path, img_hash)
+
+            try:
+                os.makedirs(folder_path)
+            except:
+                print("Image already processed...overwritting")
+                shutil.rmtree(folder_path)
+                os.makedirs(folder_path)
+            
+            
+            caption = self._generate_caption(image, True)
+            embedding = self.emotion_model.embed(image)
+            yield image, caption, embedding
+
 
 if __name__ == "__main__":
     provider = DatasetProvider()
     emotion_model = EmotionModel()
-    video_generator = OpenSoraT2VideoPipeline()
-    pair_generator = PairsGenerator(provider, emotion_model, video_generator, True)
+    video_generator = OpenSoraT2VideoPipeline(cpu_offload = True, tiling_size = 1, num_gpus = 8)
+    pair_generator = PairsGenerator(provider, emotion_model, video_generator)
 
-    pair_generator.generate_and_save_pairs(5, 'local://{os.environ.get("STORAGE_PATH")}/aura_storage/ollama_example.mp4')
+    path = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "emotion_dataset")
+    os.makedirs(path, exist_ok = True)
+    pair_generator.save_pairs(1)
