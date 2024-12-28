@@ -1,0 +1,6 @@
+{
+    "env": {
+      "NEXT_PUBLIC_WS_URL": "wss://onyx.cs.fiu.edu:9443/ws"
+    }
+  }
+  

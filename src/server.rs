@@ -246,7 +246,7 @@ async fn handle_connection(
                     let signaling_message: Result<SignalingMessage, _> = serde_json::from_str(text);
                     match signaling_message {
                         Ok(SignalingMessage::Image { data }) => {
-                            handle_image_message(data.clone()).await;
+                            // handle_image_message(data.clone()).await;
 
                             if let Some(base64_data) = data.split(',').nth(1) {
                                 if let Ok(image_bytes) =

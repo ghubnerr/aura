@@ -1,5 +1,5 @@
 import socket
-from ..webrtc import SignalingServer
+from webrtc import SignalingServer
 import sys
 import socket
 import signal
