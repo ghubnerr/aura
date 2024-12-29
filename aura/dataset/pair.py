@@ -19,10 +19,9 @@ from aura.dataset.t2v_model import *
 
 class PairsGenerator:
 
-    CAPTION_PROMPT = """Your task is to fill in the following prompt which will be used in a video generation model. The video generation should create a video which represents the aura of the following person and the video should be art in the style of Refik Anadol. Keep your response short and concise, focusing on the emotions displayed by the person and their abstract "aura". Think about how the video should look if it were to reflect the person's emotions or reaction. Provide the provided prompt found below continued by your addition - keep your addition concise, but DO NOT PROVIDE ANY OTHER TEXT. YOUR RESPONSE WILL BE AUTOMATICALLY SUPPLIED TO ANOTHER MODEL.
-    Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."""
+    CAPTION_PROMPT = """Your task is to fill in the following prompt which will be used in a video generation model. The video generation should create a video which represents the aura of the following person and the video should be art in the style of Refik Anadol. Keep your response short and concise, focusing on the emotions displayed by the person and their abstract "aura". Think about how the video should look if it were to reflect the person's emotions or reaction, incorporating colors and shapes reflective of these emotions or reactions. Return the provided prompt found below continued by your addition - keep your addition concise, but DO NOT PROVIDE ANY OTHER TEXT. YOUR RESPONSE WILL BE AUTOMATICALLY SUPPLIED TO ANOTHER MODEL."""
 
-    VIDEO_PROMPT = "Generate an abstract, large-scale digital artwork. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
+    VIDEO_PROMPT = "Generate an abstract, large-scale digital artwork in a modern gallery space. The piece features flowing, organic forms with intricate textures of clusters, ribbons, and particles. Bold, contrasting colors dominate, creating depth, motion, and balance."
 
 
     def __init__(self, dataset_provider: DatasetProvider, 
@@ -56,9 +55,15 @@ class PairsGenerator:
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
             messages = [
                 {
-                    "role": "user",
+                    "role": "developer",
                     "content": [
                         {"type": "text", "text": PairsGenerator.CAPTION_PROMPT},
+                    ]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": PairsGenerator.VIDEO_PROMPT},
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
                     ]
                 }
@@ -138,7 +143,7 @@ class PairsGenerator:
             cv2.imwrite(image_path, image)
 
             description_path = os.path.join(self.dataset_path, img_hash, "caption.txt")
-            with open(description_path, "w") as file:
+            with open(description_path, "w", encoding = "utf-8") as file:
                 file.write(caption)
 
             embedding_path = os.path.join(self.dataset_path, img_hash, "embedding.npy")
@@ -175,7 +180,7 @@ class PairsGenerator:
 if __name__ == "__main__":
     provider = DatasetProvider()
     emotion_model = EmotionModel()
-    video_generator = OpenSoraT2VideoPipeline(cpu_offload = True, tiling_size = 1, num_gpus = 8)
+    video_generator = OpenSoraT2VideoPipeline(cpu_offload = True, tiling_size = 1, num_gpus = 2)
     pair_generator = PairsGenerator(provider, emotion_model, video_generator)
 
     path = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "emotion_dataset")
