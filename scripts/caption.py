@@ -130,7 +130,7 @@ def generate_files(images):
 if __name__ == '__main__':
     provider = DatasetProvider()
     print("Finished downloading dataset!")
-    images = provider.train.extend(provider.test)
+    images = provider.dataset
     print(f"Length: {len(images)}")
     print("=" * 10)
 

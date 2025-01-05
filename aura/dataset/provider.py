@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Union, List
+from typing import Union, List, Literal, Optional
 from collections import defaultdict, Counter
 
 import cv2
@@ -10,7 +10,7 @@ import numpy as np
 CLASS_CUTOFF = 2000
 
 class DatasetProvider:
-    def __init__(self, target_size: Union[None, tuple[int, int]] = None, augment: bool = False):
+    def __init__(self, target_size: Union[None, tuple[int, int]] = None, augment: bool = False, split: Optional[float] = None):
         self.target_size = target_size
         self.emotion_labels = {
             "happy": 0,
@@ -34,28 +34,33 @@ class DatasetProvider:
         dataset_path = kagglehub.dataset_download("noamsegal/affectnet-training-data")
         os.chdir(original_dir)
 
-        dataset = self._collect_files(dataset_path, augment)
+        self.split = split
+        self.dataset = self._collect_files(dataset_path, augment)
+        if split:
+            train_size = int(len(self.dataset) * split)
+            self.train = self.dataset[:train_size]
+            self.test = self.dataset[train_size:]
 
-        train_size = int(len(dataset) * .8)
-
-        self.train = dataset[:train_size]
-        self.test = dataset[train_size:]
-
-    def sample(self, index: int, test: bool) -> tuple[np.ndarray, int, str]:
+    def sample(self, index: int, source: Optional[Literal["train", "test"]] = None) -> tuple[np.ndarray, int, str]:
         """
         Returns an image, its respective label, and emotion given an index
         """
-        dataset = self.test if test else self.train
+        dataset = self._get_dataset(source)
+
         if index >= len(dataset):
             raise ValueError(f"The index provided of value {index} is larger than the length of dataset, {len(dataset)}")
         
         return dataset[index]
 
-    def get_next_image_batch(self, batch_size: int, test: bool):
+    def get_next_image_batch(self, batch_size: int, source: Optional[Literal["train", "test"]] = None):
         """
         Generator that yields batches of images from the dataset.
         """
-        dataset = self.test if test else self.train
+        if self.test != None and not self.split:
+            raise ValueError("Batch requested from test split, but `split` parameter was not passed into DatasetProvider construction")
+
+        dataset = self._get_dataset(source)
+
         if batch_size > len(dataset):
             raise ValueError("Can't get batch size larger than dataset")
 
@@ -64,8 +69,16 @@ class DatasetProvider:
             batch_indices = indices[i:i + batch_size]
             batch = []
             for idx in batch_indices:
-                batch.append(self.sample(idx, test))
+                batch.append(self.sample(idx, source))
             yield batch
+        
+    def _get_dataset(self, source: Optional[Literal["train", "test"]] = None):
+        dataset = self.dataset # self.dataset if source is None
+        if source == "train":
+            dataset = self.test
+        elif source == "test":
+            dataset = self.train
+        return dataset
 
     def label_distr(self, test = False):
         dataset = self.test if test else self.train
@@ -79,7 +92,7 @@ class DatasetProvider:
             raise ValueError(f"Path, {path}, is not in proper format to parse emotion")
         return dirs[-2]
 
-    def _collect_files(self, path: str, augment: bool = False) -> List[str]:
+    def _collect_files(self, path: str, augment: bool = False) -> List[tuple[np.ndarray, int, str]]:
         dataset = []
         label_counter = defaultdict(int)
         for dirpath, _, filenames in os.walk(path):
@@ -89,19 +102,18 @@ class DatasetProvider:
                     continue
 
                 emotion = self._get_emotion(img_path)
-                if label_counter[emotion] >= 2000:
+                if label_counter[emotion] >= CLASS_CUTOFF:
                     continue
                 
                 label = self.emotion_labels[emotion]
                 img = cv2.imread(img_path)
 
+                mods = [img]
                 if augment:
                     rot_img = self._random_rotation(img)
                     flip_img = self._flip(img)
                     bright_img = self._random_brightness(img)
-                    mods = [img, rot_img, flip_img, bright_img]
-                else:
-                    mods = [img]
+                    mods.extend([img, rot_img, flip_img, bright_img])
 
                 for mod in mods:
                     dataset.append((mod, label, emotion))
