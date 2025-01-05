@@ -32,13 +32,29 @@ class EmotionModel(nn.Module):
         x = self.backbone(x)
         return x
     
-    def embed(self, image: np.ndarray):
+    def embed(self, image: np.ndarray, use_representation: bool = False):
         image = Image.fromarray(image)
         image = self.transform(image)
-        image = image.unsqueeze(0) # add batch dim
-        image.to(self.device)
-        return self(image)
+        image = image.unsqueeze(0)  
+        image = image.to(self.device)  # move image to the correct device
 
+        if use_representation:
+            def hook(module, input, output):
+                self.representation = output
+
+            # Register the hook on the second-to-last layer
+            handle = self.backbone.layer4[1].register_forward_hook(hook)
+            self.eval()  
+            with torch.no_grad():
+                self(image)
+            handle.remove()
+
+            gap_representation = self.representation.mean(dim=[2, 3])  # mean over spatial dimensions (H, W)
+            
+            return gap_representation # Return the GAP representation
+
+        else:
+            return self(image)
     
     def save(self, path = None):
         if path:

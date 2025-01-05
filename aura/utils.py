@@ -2,6 +2,7 @@ import base64
 import hashlib
 
 import numpy as np
+np.random.seed(42)
 
 def hash_image(img: np.ndarray, length: int = 10) -> str:
         arr_bytes = img.tobytes()

@@ -13,7 +13,7 @@ import ollama
 from PIL import Image
 
 from aura.utils import hash_image
-from aura.dataset.provider import DatasetProvider
+from aura.dataset.dataset_provider import DatasetProvider
 from aura.dataset.t2v_model import *
 
 
@@ -100,6 +100,9 @@ class PairsGenerator:
         - storage_path: Path to the storage location (local - local:// \
                         - or Hugging Face dataset - hf://).
         """
+        
+        raise NotImplementedError()
+    
         import huggingface_hub
         huggingface_hub.login()
 
