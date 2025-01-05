@@ -51,7 +51,7 @@ class EmotionModel(nn.Module):
 
             gap_representation = self.representation.mean(dim=[2, 3])  # mean over spatial dimensions (H, W)
             
-            return gap_representation # Return the GAP representation
+            return gap_representation.cpu().numpy()  # Return the GAP representation
 
         else:
             return self(image)
