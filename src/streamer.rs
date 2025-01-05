@@ -217,7 +217,7 @@ async fn start_webrtc(
     });
 
     // Connect to signaling server
-    let (ws_stream, _) = connect_async(format!("ws://{}:{}/signaling", ws_ip, ws_port)).await?;
+    let (ws_stream, _) = connect_async(format!("ws://{}:{}/ws", ws_ip, ws_port)).await?;
     let (write, mut read) = ws_stream.split();
     let write = Arc::new(Mutex::new(write));
     let pc = Arc::clone(&peer_connection);

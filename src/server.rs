@@ -53,7 +53,7 @@ impl SignalingServer {
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
-                let signaling_route = warp::path("signaling")
+                let signaling_route = warp::path("ws")
                     .and(warp::ws())
                     .and(with_peers(peers.clone()))
                     .and(warp::any().map(move || last_captured_image.clone()))
@@ -62,7 +62,7 @@ impl SignalingServer {
                     });
 
                 let ip_addr: std::net::IpAddr = ip.parse().expect("Invalid IP address");
-                println!("Signaling server running on ws://{}:{}/signaling", ip, port);
+                println!("Signaling server running on ws://{}:{}/ws", ip, port);
                 warp::serve(signaling_route).run((ip_addr, port)).await;
             });
         });

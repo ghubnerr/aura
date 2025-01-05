@@ -21,7 +21,7 @@ def signaling_server(unused_tcp_port):
     server.start()
 
     async def is_server_ready():
-        uri = f'ws://localhost:{unused_tcp_port}/signaling'
+        uri = f'ws://localhost:{unused_tcp_port}/ws'
         for _ in range(10):
             try:
                 async with websockets.connect(uri):
@@ -44,7 +44,7 @@ async def websocket_clients(signaling_server, unused_tcp_port):
     client1 = None
     client2 = None
     try:
-        uri = f'ws://localhost:{unused_tcp_port}/signaling'
+        uri = f'ws://localhost:{unused_tcp_port}/ws'
         client1 = await websockets.connect(uri)
         client2 = await websockets.connect(uri)
         yield client1, client2
@@ -72,7 +72,7 @@ async def test_client_connection(signaling_server, unused_tcp_port):
     initial_count = signaling_server.get_client_count()
     assert initial_count == 0
 
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     async with websockets.connect(uri) as websocket:
         await asyncio.sleep(0.1)
         assert signaling_server.get_client_count() == 1
@@ -80,7 +80,7 @@ async def test_client_connection(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_signaling_message_exchange(signaling_server, unused_tcp_port):
     """Test sending and receiving signaling messages between clients"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
         await asyncio.sleep(0.1)
@@ -100,7 +100,7 @@ async def test_signaling_message_exchange(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_broadcast_message(signaling_server, unused_tcp_port):
     """Test broadcasting messages to all clients"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
         await asyncio.sleep(0.1)
@@ -117,7 +117,7 @@ async def test_broadcast_message(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_disconnect_client(signaling_server, unused_tcp_port):
     """Test disconnecting a client"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     async with websockets.connect(uri) as client:
         await asyncio.sleep(0.1)
@@ -136,7 +136,7 @@ async def test_disconnect_client(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_send_to_client(signaling_server, unused_tcp_port):
     """Test sending messages to specific clients"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     async with websockets.connect(uri) as client1, websockets.connect(uri) as client2:
         await asyncio.sleep(0.1)
@@ -155,7 +155,7 @@ async def test_send_to_client(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_server_status(signaling_server, unused_tcp_port):
     """Test server status information"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     status = signaling_server.get_server_status()
     assert isinstance(status, dict)
@@ -172,7 +172,7 @@ async def test_server_status(signaling_server, unused_tcp_port):
 @pytest.mark.asyncio
 async def test_client_capacity(signaling_server, unused_tcp_port):
     """Test server capacity handling"""
-    uri = f'ws://localhost:{unused_tcp_port}/signaling'
+    uri = f'ws://localhost:{unused_tcp_port}/ws'
     
     assert signaling_server.is_at_capacity() == False
     
