@@ -180,9 +180,9 @@ class PairsGenerator:
 if __name__ == "__main__":
     provider = DatasetProvider()
     emotion_model = EmotionModel()
-    video_generator = OpenSoraT2VideoPipeline(cpu_offload = True, tiling_size = 1, num_gpus = 2)
+    video_generator = OpenSoraT2VideoPipeline(num_gpus = 4)
     pair_generator = PairsGenerator(provider, emotion_model, video_generator)
 
     path = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "emotion_dataset")
     os.makedirs(path, exist_ok = True)
-    pair_generator.save_pairs(1)
+    pair_generator.save_pairs(2_500)
