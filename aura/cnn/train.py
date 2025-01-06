@@ -2,8 +2,8 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from ..dataset import DatasetProvider
-from .model import EmotionModel
+from aura.dataset import DatasetProvider
+from aura.cnn import EmotionModel
 
 
 def create_heatmap(true, pred, path):

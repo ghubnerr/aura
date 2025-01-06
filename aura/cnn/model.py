@@ -11,10 +11,10 @@ from tqdm import tqdm
 from PIL import Image
 
 class EmotionModel(nn.Module):
-    def __init__(self, pretrained = False):
+    def __init__(self, pretrained=False):
         super(EmotionModel, self).__init__()
-
-        self.backbone = models.resnet18(pretrained = pretrained)
+        
+        self.backbone = models.resnet50(pretrained=pretrained)
         num_features = self.backbone.fc.in_features
         self.backbone.fc = nn.Linear(num_features, 8)
         self.fc = self.backbone.fc
@@ -22,40 +22,85 @@ class EmotionModel(nn.Module):
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.parameters(), lr=1e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=2, gamma=0.1)
+
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
+        
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x):
-        x = self.backbone(x)
-        return x
+        return self.backbone(x)
     
-    def embed(self, image: np.ndarray, use_representation: bool = False):
-        image = Image.fromarray(image)
-        image = self.transform(image)
-        image = image.unsqueeze(0)  
-        image = image.to(self.device)  # move image to the correct device
+    def embed(self, image: np.ndarray, use_representation: bool = False, skip_transform: bool = False):
+        if not skip_transform:
+            if isinstance(image, torch.Tensor):
+                image = image.cpu().numpy()
+            
+            if image.dtype == np.uint8:
+                image = image.astype(np.float32) / 255.0
+            
+            transformed_image = self.transform(image)
+            transformed_image = transformed_image.unsqueeze(0).to(self.device)
+        else:
+            if isinstance(image, np.ndarray):
+                transformed_image = torch.from_numpy(image)
+            elif isinstance(image, torch.Tensor):
+                transformed_image = image
+            
+            if transformed_image.dim() == 3:
+                transformed_image = transformed_image.unsqueeze(0)
+            transformed_image = transformed_image.to(self.device)
 
         if use_representation:
             def hook(module, input, output):
                 self.representation = output
 
-            # Register the hook on the second-to-last layer
-            handle = self.backbone.layer4[1].register_forward_hook(hook)
-            self.eval()  
+            handle = self.backbone.avgpool.register_forward_hook(hook)
+            self.eval()
             with torch.no_grad():
-                self(image)
+                self(transformed_image)
             handle.remove()
 
-            gap_representation = self.representation.mean(dim=[2, 3])  # mean over spatial dimensions (H, W)
-            
-            return gap_representation.cpu().numpy()  # Return the GAP representation
-
+            # Squeeze the extra dimensions to get a 2048-dimensional vector
+            gap_representation = self.representation.squeeze().cpu().detach().numpy()
+            return gap_representation
         else:
-            return self(image)
-    
+            return self(transformed_image)
+        
+    def batched_embed(self, images, use_representation: bool = False, skip_transform: bool = False):
+        if not skip_transform:
+            if isinstance(images, torch.Tensor):
+                if images.dim() == 3:
+                    images = images.unsqueeze(0)
+            elif isinstance(images, np.ndarray):
+                if images.ndim == 3:
+                    images = np.expand_dims(images, 0)
+                images = torch.from_numpy(images)
+            
+            transformed_images = torch.stack([self.transform(img) for img in images]).to(self.device)
+        else:
+            transformed_images = images.to(self.device)
+
+        if use_representation:
+            representations = []
+            def hook(module, input, output):
+                representations.append(output)
+
+            handle = self.backbone.avgpool.register_forward_hook(hook)
+            self.eval()
+            with torch.no_grad():
+                self(transformed_images)
+            handle.remove()
+
+            # Process all representations at once
+            batch_representations = torch.cat(representations, dim=0)
+            return batch_representations.squeeze().cpu().detach().numpy()
+        else:
+            return self(transformed_images)
+
+
     def save(self, path = None):
         if path:
             torch.save(self.state_dict(), path)
@@ -183,3 +228,34 @@ class EmotionModel(nn.Module):
                 print(f"Label {label}: No samples in validation set.")
         
         return true_labels, pred_labels
+    
+    
+if __name__ == "__main__":
+    seed = 42
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    
+    model = EmotionModel(pretrained=True)
+    model.to(model.device)
+    model.eval()
+
+    test_image = np.random.rand(224, 224, 3).astype(np.float32)
+    
+    transformed_image = model.transform(test_image)
+    transformed_image = transformed_image.to(model.device)
+
+    with torch.no_grad():
+        feature_vector = model.embed(transformed_image, use_representation=True, skip_transform=True)
+        
+        feature_tensor = torch.tensor(feature_vector, device=model.device, dtype=torch.float32)
+        logits_from_embed = model.fc(feature_tensor).cpu().numpy()
+        logits_direct = model(transformed_image.unsqueeze(0)).cpu().numpy()
+
+    print("Logits from embed method and final layer:", logits_from_embed)
+    print("Logits from direct model call:", logits_direct)
+
+    assert np.allclose(logits_from_embed, logits_direct, atol=1e-6), "Outputs do not match!"
+    print("Test passed: Outputs from both methods are the same.")
