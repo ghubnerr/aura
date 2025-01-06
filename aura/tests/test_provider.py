@@ -11,7 +11,7 @@ def dataset_provider():
         with patch.object(DatasetProvider, '_collect_files') as mock_collect:
             mock_data = [(np.zeros((64, 64, 3)), 0, "happy") for _ in range(10)]
             mock_collect.return_value = mock_data
-            provider = DatasetProvider(target_size=(224, 224))
+            provider = DatasetProvider(target_size=(224, 224), split = 0.7)
             return provider
         
 def test_collect_files_with_augmentation(dataset_provider):
@@ -47,7 +47,7 @@ def test_init(dataset_provider):
     assert len(dataset_provider.test) == 2   
 
 def test_sample_valid_index(dataset_provider):
-    img, label, emotion = dataset_provider.sample(0, test=False)
+    img, label, emotion = dataset_provider.sample(0, source = "test")
     assert isinstance(img, np.ndarray)
     assert img.shape == (64, 64, 3)
     assert isinstance(label, int)
@@ -56,11 +56,11 @@ def test_sample_valid_index(dataset_provider):
 
 def test_sample_invalid_index(dataset_provider):
     with pytest.raises(ValueError):
-        dataset_provider.sample(100, test=False)
+        dataset_provider.sample(100, source = "train")
 
 def test_get_next_image_batch(dataset_provider):
     batch_size = 2
-    batch_generator = dataset_provider.get_next_image_batch(batch_size, test=False)
+    batch_generator = dataset_provider.get_next_image_batch(batch_size, source = "train")
     first_batch = next(batch_generator)
     
     assert len(first_batch) == batch_size
@@ -69,7 +69,7 @@ def test_get_next_image_batch(dataset_provider):
 
 def test_get_next_image_batch_invalid_size(dataset_provider):
     with pytest.raises(ValueError):
-        next(dataset_provider.get_next_image_batch(100, test=False))
+        next(dataset_provider.get_next_image_batch(100, source = "train"))
 
 def test_resize_image(dataset_provider):
     test_image = np.zeros((100, 150, 3), dtype=np.uint8)

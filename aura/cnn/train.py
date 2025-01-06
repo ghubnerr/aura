@@ -2,8 +2,8 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from ..dataset import DatasetProvider
-from .model import EmotionModel
+from aura.dataset import DatasetProvider
+from aura.cnn import EmotionModel
 
 
 def create_heatmap(true, pred, path):
@@ -16,7 +16,7 @@ def create_heatmap(true, pred, path):
     plt.close()
 
 if __name__ == "__main__":
-    provider = DatasetProvider()
+    provider = DatasetProvider(augment = True, split = 0.7)
 
     print("Training Data Distr.")
     provider.label_distr()
