@@ -9,7 +9,7 @@ class PairsProvider:
         self.dataset_path = os.path.join(self.storage_path, "aura_storage", "emotion_dataset")
         self.embedding_dim = embedding_dim
 
-    def load_pair(self, hash_id: str) -> Tuple[np.ndarray, str, np.ndarray, str]:
+    def load_pair(self, hash_id: str) -> Tuple[str, str, str, str]:
         """
         Loads the four components (face image, caption, embedding, video path) 
         for a given hash ID from the dataset path.
@@ -29,12 +29,10 @@ class PairsProvider:
         embedding_path = os.path.join(folder_path, "embedding.npy")
         video_path = os.path.join(folder_path, "video.mp4")
 
-        face_image = PairsProvider.load_image(face_image_path)
         with open(caption_path, 'r', encoding='utf-8') as f:
             caption = f.read().strip()
-        embedding = np.load(embedding_path)
 
-        return face_image, caption, embedding, video_path
+        return face_image_path, caption, embedding_path, video_path
     
     @staticmethod
     def load_image(image_path: str) -> np.ndarray:
