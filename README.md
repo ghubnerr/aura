@@ -34,18 +34,33 @@
   <img src="docs/aura.png" alt="Landscape" style="width:100%;">
 </div>
 
+### Emotion Feature Encoder Visualization with t-SNE
+
+<img alt="Feature Encoder Output" src="./docs/t-sne.png">
+
+### Face-Art Example
+
+<img alt="Feature Encoder Output" src="./docs/example-art.png">
+
+- Caption:
+
+> The artwork embodies a sense of vulnerability and innocence, expressed through soft, swirling curves that evoke warmth and comfort. Gentle shades of blue and muted grays intermingle with bursts of bright yellow and soft pastels, creating an interplay of solace and hope. The movement of the forms reflects subtle emotions, suggesting a narrative of resilience, and the texture of the piece gives a tactile quality, inviting viewers to connect with the underlying feelings of compassion and empathy.
+
 ## Progress So Far
+
 - [ ] Host UI on a website
 - [ ] Create CLIP-based script for StyleGAN-V interpolations
-- [ ] Generate Pairs of Embeddings and Videos with OpenSora and store on a large enough storage
-- [ ] Implement Queueing System in Python and in the UI
-- [ ] Create model endpoint to receive screen captures
+- [ ] Enhance CLIP performance at Recall @ K
+- [ ] Train StyleGAN-V
+- [x] Implement Queueing System in Python
+- [x] Create model endpoint to receive screen captures
+- [x] Generate Pairs of Embeddings and Videos with OpenSora and store on a large enough storage
 - [x] Create Ollama pipeline to generate video prompts to OpenSora
 - [x] Design an image processing pipeline to remove unfairness
 - [x] Find an emotion classification dataset
 - [x] Create Emotion Classifier Encoder CNN
 - [x] Allow screen-capture so that it can be sent to the model
-- [x] Create WebRTC renegotiation pipeline in Rust 
+- [x] Create WebRTC renegotiation pipeline in Rust
 
 ## How to Contribute
 
