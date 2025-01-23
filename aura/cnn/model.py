@@ -11,6 +11,24 @@ from tqdm import tqdm
 from PIL import Image
 
 class EmotionModel(nn.Module):
+    """Deep learning model for emotion classification using ResNet50 backbone.
+    
+    A CNN-based model that performs emotion classification across 8 categories using 
+    a modified ResNet50 architecture. Supports both inference and feature extraction.
+    
+    Args:
+        pretrained (bool): Whether to initialize with pretrained ResNet50 weights
+    
+    Attributes:
+        backbone (nn.Module): ResNet50 model backbone
+        fc (nn.Linear): Final fully connected layer (num_features -> 8)
+        criterion (nn.Module): Loss function (CrossEntropyLoss)
+        optimizer (optim.Optimizer): Adam optimizer
+        scheduler (optim.lr_scheduler): Learning rate scheduler
+        transform (transforms.Compose): Image preprocessing pipeline
+        device (torch.device): Device to run the model on (CPU/GPU)
+    """
+
     def __init__(self, pretrained=False):
         super(EmotionModel, self).__init__()
         
@@ -31,9 +49,35 @@ class EmotionModel(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def forward(self, x):
+        """Forward pass of the model.
+        
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, 3, H, W)
+        
+        Returns:
+            torch.Tensor: Model predictions of shape (batch_size, 8)
+        """
         return self.backbone(x)
     
-    def embed(self, image: np.ndarray, use_representation: bool = False, skip_transform: bool = False):
+    def embed(self, image, use_representation=False, skip_transform=False):
+        """Extract features or predictions from an input image.
+        
+        Args:
+            image (Union[np.ndarray, torch.Tensor]): Input image in one of these formats:
+                - np.ndarray: RGB image of shape (H, W, 3)
+                - torch.Tensor: RGB tensor of shape (3, H, W) or (1, 3, H, W)
+            use_representation (bool): If True, return GAP features instead of predictions
+            skip_transform (bool): If True, skip image preprocessing steps
+        
+        Returns:
+            Union[np.ndarray, torch.Tensor]: One of:
+                - np.ndarray: GAP features of shape (2048,) if use_representation=True
+                - torch.Tensor: Class predictions of shape (1, 8) if use_representation=False
+        
+        Notes:
+            When use_representation=True, extracts features from the global average pooling
+            layer (2048-dimensional vector). Otherwise, returns model's class predictions.
+        """
         if not skip_transform:
             if isinstance(image, torch.Tensor):
                 image = image.cpu().numpy()
@@ -63,43 +107,11 @@ class EmotionModel(nn.Module):
                 self(transformed_image)
             handle.remove()
 
-            # Squeeze the extra dimensions to get a 2048-dimensional vector
             gap_representation = self.representation.squeeze().cpu().detach().numpy()
             return gap_representation
         else:
             return self(transformed_image)
         
-    def batched_embed(self, images, use_representation: bool = False, skip_transform: bool = False):
-        if not skip_transform:
-            if isinstance(images, torch.Tensor):
-                if images.dim() == 3:
-                    images = images.unsqueeze(0)
-            elif isinstance(images, np.ndarray):
-                if images.ndim == 3:
-                    images = np.expand_dims(images, 0)
-                images = torch.from_numpy(images)
-            
-            transformed_images = torch.stack([self.transform(img) for img in images]).to(self.device)
-        else:
-            transformed_images = images.to(self.device)
-
-        if use_representation:
-            representations = []
-            def hook(module, input, output):
-                representations.append(output)
-
-            handle = self.backbone.avgpool.register_forward_hook(hook)
-            self.eval()
-            with torch.no_grad():
-                self(transformed_images)
-            handle.remove()
-
-            # Process all representations at once
-            batch_representations = torch.cat(representations, dim=0)
-            return batch_representations.squeeze().cpu().detach().numpy()
-        else:
-            return self(transformed_images)
-
 
     def save(self, path = None):
         if path:

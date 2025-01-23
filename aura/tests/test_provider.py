@@ -43,8 +43,8 @@ def test_collect_files_without_augmentation(dataset_provider):
 def test_init(dataset_provider):
     assert dataset_provider.target_size == (224, 224)
     assert len(dataset_provider.emotion_labels) == 8
-    assert len(dataset_provider.train) == 8 
-    assert len(dataset_provider.test) == 2   
+    assert len(dataset_provider.train) == 7
+    assert len(dataset_provider.test) == 3
 
 def test_sample_valid_index(dataset_provider):
     img, label, emotion = dataset_provider.sample(0, source = "test")

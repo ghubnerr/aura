@@ -113,7 +113,7 @@ class DatasetProvider:
                     rot_img = self._random_rotation(img)
                     flip_img = self._flip(img)
                     bright_img = self._random_brightness(img)
-                    mods.extend([img, rot_img, flip_img, bright_img])
+                    mods.extend([rot_img, flip_img, bright_img])
 
                 for mod in mods:
                     dataset.append((mod, label, emotion))
