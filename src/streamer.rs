@@ -9,9 +9,7 @@ use std::sync::Arc;
 use std::{fs::File, io::BufReader, time::Duration};
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{connect_async, tungstenite::Message as TungsteniteMessage};
-use webrtc::peer_connection::RTCPeerConnection;
-use webrtc::rtp_transceiver::rtp_codec::RTPCodecType;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use webrtc::{
     api::{
         interceptor_registry::register_default_interceptors,
@@ -34,7 +32,6 @@ pub struct VideoStreamer {
     ws_ip: String,
     ws_port: u16,
     ivf_dir: String,
-    peer_connection: Arc<Mutex<Option<Arc<RTCPeerConnection>>>>,
 }
 
 #[pymethods]
@@ -46,7 +43,6 @@ impl VideoStreamer {
             ws_ip,
             ws_port,
             ivf_dir,
-            peer_connection: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -55,14 +51,11 @@ impl VideoStreamer {
         let ws_ip = self.ws_ip.clone();
         let ws_port = self.ws_port;
         let ivf_dir = self.ivf_dir.clone();
-        let peer_connection_store = self.peer_connection.clone();
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
-                // Setup WebRTC and signaling
-                if let Err(e) = start_webrtc(&ws_ip, ws_port, &ivf_dir, peer_connection_store).await
-                {
+                if let Err(e) = start_webrtc(&ws_ip, ws_port, &ivf_dir).await {
                     eprintln!("Error starting WebRTC: {}", e);
                 }
             });
@@ -70,124 +63,24 @@ impl VideoStreamer {
 
         Ok(())
     }
-
-    #[pyo3(text_signature = "(self) -> bytes")]
-    fn take_screenshot(&self) -> PyResult<Vec<u8>> {
-        let peer_connection = self.peer_connection.clone();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
-            if let Some(pc) = peer_connection.lock().await.as_ref() {
-                match capture_screenshot(pc).await {
-                    Ok(screenshot) => Ok(screenshot),
-                    Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to capture screenshot: {}",
-                        e
-                    ))),
-                }
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    "No active peer connection",
-                ))
-            }
-        })
-    }
-
-    #[pyo3(text_signature = "(self) -> str")]
-    fn get_connection_state(&self) -> PyResult<String> {
-        let peer_connection = self.peer_connection.clone();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
-            if let Some(pc) = peer_connection.lock().await.as_ref() {
-                Ok(pc.connection_state().to_string())
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    "No active peer connection",
-                ))
-            }
-        })
-    }
-
-    #[pyo3(text_signature = "(self) -> str")]
-    fn get_signaling_state(&self) -> PyResult<String> {
-        let peer_connection = self.peer_connection.clone();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
-            if let Some(pc) = peer_connection.lock().await.as_ref() {
-                Ok(pc.signaling_state().to_string())
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    "No active peer connection",
-                ))
-            }
-        })
-    }
-
-    #[pyo3(text_signature = "(self) -> str")]
-    fn get_stats(&self) -> PyResult<String> {
-        let peer_connection = self.peer_connection.clone();
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
-            if let Some(pc) = peer_connection.lock().await.as_ref() {
-                let stats = pc.get_stats().await;
-                match serde_json::to_string(&stats) {
-                    Ok(stats_string) => Ok(stats_string),
-                    Err(e) => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to serialize stats: {}",
-                        e
-                    ))),
-                }
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    "No active peer connection",
-                ))
-            }
-        })
-    }
-
-    #[pyo3(text_signature = "(self) -> None")]
-    fn close_connection(&self) -> PyResult<()> {
-        let peer_connection = self.peer_connection.clone();
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async move {
-            if let Some(pc) = peer_connection.lock().await.as_ref() {
-                if let Err(e) = pc.close().await {
-                    return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to close connection: {}",
-                        e
-                    )));
-                }
-                *peer_connection.lock().await = None;
-                Ok(())
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
-                    "No active peer connection",
-                ))
-            }
-        })
-    }
 }
 
-async fn start_webrtc(
-    ws_ip: &str,
-    ws_port: u16,
-    ivf_dir: &str,
-    peer_connection_store: Arc<Mutex<Option<Arc<RTCPeerConnection>>>>,
-) -> Result<()> {
+async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
+    // Create MediaEngine
     let mut m = MediaEngine::default();
     m.register_default_codecs()?;
 
+    // Create a registry for interceptors
     let mut registry = Registry::new();
     registry = register_default_interceptors(registry, &mut m)?;
 
+    // Create the API object
     let api = APIBuilder::new()
         .with_media_engine(m)
         .with_interceptor_registry(registry)
         .build();
 
+    // Prepare the configuration
     let config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
             urls: vec!["stun:stun.l.google.com:19302".to_owned()],
@@ -196,8 +89,10 @@ async fn start_webrtc(
         ..Default::default()
     };
 
+    // Create a new RTCPeerConnection
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
-    *peer_connection_store.lock().await = Some(Arc::clone(&peer_connection));
+
+    // Create video track
     let video_track = Arc::new(TrackLocalStaticSample::new(
         RTCRtpCodecCapability {
             mime_type: MIME_TYPE_VP8.to_owned(),
@@ -207,10 +102,12 @@ async fn start_webrtc(
         "webcam".to_owned(),
     ));
 
+    // Add track to peer connection
     let rtp_sender = peer_connection
         .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>)
         .await?;
 
+    // Handle RTCP packets
     tokio::spawn(async move {
         let mut rtcp_buf = vec![0u8; 1500];
         while let Ok((_, _)) = rtp_sender.read(&mut rtcp_buf).await {}
@@ -218,15 +115,17 @@ async fn start_webrtc(
 
     // Connect to signaling server
     let (ws_stream, _) = connect_async(format!("ws://{}:{}/signaling", ws_ip, ws_port)).await?;
-    let (write, mut read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
     let write = Arc::new(Mutex::new(write));
     let pc = Arc::clone(&peer_connection);
 
+    // Handle connection state changes
     peer_connection.on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
         println!("Connection State has changed: {s}");
         Box::pin(async {})
     }));
 
+    // Handle incoming messages
     let write_clone = Arc::clone(&write);
     tokio::spawn(async move {
         while let Some(msg) = read.next().await {
@@ -244,9 +143,7 @@ async fn start_webrtc(
                             let msg = SignalingMessage::Answer { sdp: answer.sdp };
                             let mut write = write_clone.lock().await;
                             write
-                                .send(TungsteniteMessage::Text(
-                                    serde_json::to_string(&msg).unwrap(),
-                                ))
+                                .send(Message::Text(serde_json::to_string(&msg).unwrap()))
                                 .await
                                 .unwrap();
                         }
@@ -273,9 +170,7 @@ async fn start_webrtc(
                             println!("Received image message - ignoring in WebRTC context");
                         }
                         SignalingMessage::TriggerImageCapture => {
-                            println!(
-                                "Received trigger capture message - ignoring in WebRTC context"
-                            );
+                            println!("Received trigger capture message - ignoring in WebRTC context");
                         }
                     }
                 }
@@ -284,7 +179,7 @@ async fn start_webrtc(
     });
 
     println!("Starting video stream...");
-    watch_and_stream_video(ivf_dir, video_track).await?;
+    watchand_stream_video(ivf_dir, video_track).await?;
 
     Ok(())
 }
@@ -312,45 +207,12 @@ async fn write_video_to_track(path: &str, track: Arc<TrackLocalStaticSample>) ->
     }
 }
 
-async fn capture_screenshot(peer_connection: &Arc<RTCPeerConnection>) -> Result<Vec<u8>> {
-    let transceivers = peer_connection.get_transceivers().await;
-
-    for transceiver in transceivers {
-        let receiver = transceiver.receiver().await;
-        let tracks = receiver.tracks().await;
-
-        for track in tracks {
-            if track.kind() == RTPCodecType::Video {
-                let mut buffer = vec![0u8; 1500];
-
-                let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1);
-                let tx = tx.clone();
-
-                tokio::spawn(async move {
-                    if let Ok((rtp_packet, _)) = track.read(&mut buffer).await {
-                        // Access the payload data from the RTP packet
-                        let payload = rtp_packet.payload.clone();
-                        let _ = tx.send(payload.to_vec()).await;
-                    }
-                });
-
-                if let Ok(Some(frame_data)) =
-                    tokio::time::timeout(Duration::from_secs(5), rx.recv()).await
-                {
-                    return Ok(frame_data);
-                }
-            }
-        }
-    }
-
-    Err(anyhow::Error::msg(
-        "No video track found or timeout occurred",
-    ))
-}
-
-async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSample>) -> Result<()> {
+//File watcher
+async fn watchand_stream_video(directory: &str, track: Arc<TrackLocalStaticSample>) -> Result<()> {
+    // Create a channel for file events
     let (tx, mut rx) = mpsc::channel(100);
 
+    // Create an async file watcher
     let mut watcher = RecommendedWatcher::new(
         move |res| {
             if let Ok(event) = res {
@@ -360,12 +222,14 @@ async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSamp
         Config::default(),
     )?;
 
+    // Start watching the specified directory
     watcher.watch(std::path::Path::new(directory), RecursiveMode::NonRecursive)?;
 
     println!("Watching directory: {}", directory);
 
-    let mut current_file;
+    let mut current_file = String::new();
 
+    // Event loop
     while let Some(event) = rx.recv().await {
         if let Event {
             kind: EventKind::Modify(_),

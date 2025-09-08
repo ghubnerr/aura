@@ -100,6 +100,7 @@ impl SignalingServer {
 
         Ok(())
     }
+
     #[pyo3(text_signature = "(self, client_id: str, message: str) -> bool")]
     pub fn send_to_client(&self, client_id: String, message: String) -> PyResult<bool> {
         let peers = self.peers.clone();
@@ -243,9 +244,14 @@ async fn handle_connection(
         match result {
             Ok(msg) => {
                 if let Ok(text) = msg.to_str() {
+                    println!("Received message from {}: {}", client_id, text);
+
+                    // Attempt to parse the message
                     let signaling_message: Result<SignalingMessage, _> = serde_json::from_str(text);
                     match signaling_message {
                         Ok(SignalingMessage::Image { data }) => {
+                            // Handle image message
+                            println!("Handling image message from client {}", client_id);
                             handle_image_message(data.clone()).await;
 
                             if let Some(base64_data) = data.split(',').nth(1) {
@@ -258,16 +264,21 @@ async fn handle_connection(
                             }
                         }
                         Ok(message) => {
+                            // Handle other signaling messages
+                            println!("Parsed signaling message: {:?}", message);
                             forward_message(&client_id, &message, &peers).await;
                         }
                         Err(e) => {
-                            eprintln!("Error parsing message: {:?}", e);
+                            eprintln!(
+                                "Error parsing message from client {}: {} - Error: {:?}",
+                                client_id, text, e
+                            );
                         }
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Error receiving message: {}", e);
+                eprintln!("Error receiving message for client {}: {}", client_id, e);
                 break;
             }
         }
@@ -302,6 +313,16 @@ async fn handle_image_message(data: String) {
     }
 }
 
+async fn trigger_image_capture(
+    sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let message = serde_json::to_string(&SignalingMessage::TriggerImageCapture)?;
+    let mut sender = sender.lock().await;
+    sender.send(Message::text(message)).await?;
+    println!("Sent image capture trigger to client.");
+    Ok(())
+}
+
 async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Peers) {
     let serialized_message = match serde_json::to_string(message) {
         Ok(json) => json,
@@ -311,7 +332,7 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-    let peers = peers.lock().await;
+    let peers = peers.lock().await; // Await the async Mutex lock
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
             let mut client = client.lock().await; // Await the async Mutex lock
@@ -320,14 +341,4 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
             }
         }
     }
-}
-
-async fn trigger_image_capture(
-    sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let message = serde_json::to_string(&SignalingMessage::TriggerImageCapture)?;
-    let mut sender = sender.lock().await;
-    sender.send(Message::text(message)).await?;
-    println!("Sent image capture trigger to client.");
-    Ok(())
 }

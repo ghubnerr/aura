@@ -92,3 +92,5 @@ temp/
 logs/
 
 aura/cnn/checkpoints/
+
+*.pth

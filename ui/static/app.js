@@ -1,4 +1,4 @@
-const signalingSocket = new WebSocket("ws://127.0.0.1:8765/signaling");
+const signalingSocket = new WebSocket("ws://127.0.0.1:3030/signaling");
 const localVideo = document.getElementById("localVideo");
 const remoteVideo = document.getElementById("remoteVideo");
 
@@ -102,6 +102,11 @@ signalingSocket.onmessage = async (message) => {
         }
     } else if (data.type === "image") {
         console.log("Received image data:", data.data);
+    } else if (data.type === "triggerimagecapture") {
+        console.log("Received trigger from server, capturing frame...");
+        captureFrame();
+    } else {
+        console.log("Unknown message type:", data);
     }
 };
 
@@ -112,19 +117,8 @@ pc.ontrack = (event) => {
     }
 };
 
-signalingSocket.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    if (message.type === "triggerimagecapture") {
-      console.log("Received trigger from server, capturing frame...");
-      captureFrame();
-    } else {
-      console.log("Unknown message type:", message);
-    }
-  };
-  
 const captureImageBtn = document.getElementById("captureImage");
 const capturedImage = document.getElementById("capturedImage");
-
 
 // Capture the video frame and display it as an image
 captureImageBtn.addEventListener("click", () => {
@@ -178,5 +172,3 @@ function captureFrame() {
         console.error("Failed to get canvas context for drawing.");
     }
 }
-
-
