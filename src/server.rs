@@ -1,3 +1,8 @@
+//! # Signaling Server Module
+//!
+//! This module provides a WebSocket-based signaling server for WebRTC peer connections.
+//! It handles client connections, message routing, and image capture functionality.
+
 use crate::SignalingMessage;
 
 use anyhow::Result;
@@ -17,18 +22,33 @@ use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 use warp::Filter;
 
+/// Type alias for managing connected WebSocket peers
 pub type Peers = Arc<Mutex<HashMap<String, Arc<Mutex<SplitSink<WebSocket, Message>>>>>>;
 
+/// WebSocket-based signaling server for WebRTC peer connections.
+///
+/// The SignalingServer manages client connections, handles WebRTC signaling messages,
+/// and provides image capture functionality for connected clients.
 #[pyclass]
 pub struct SignalingServer {
+    /// Map of connected client IDs to their WebSocket senders
     pub peers: Peers,
+    /// Server port number
     pub port: u16,
+    /// Server IP address
     pub ip: String,
+    /// Last captured image data from clients
     pub last_captured_image: Arc<Mutex<Option<Vec<u8>>>>,
 }
 
 #[pymethods]
 impl SignalingServer {
+    /// Create a new SignalingServer instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `port` - Optional port number (defaults to 3030)
+    /// * `ip` - Optional IP address (defaults to "127.0.0.1")
     #[new]
     #[pyo3(signature = (port=None, ip=None))]
     #[pyo3(
@@ -43,6 +63,9 @@ impl SignalingServer {
         }
     }
 
+    /// Start the signaling server.
+    ///
+    /// This method starts the WebSocket server and begins accepting client connections.
     #[pyo3(text_signature = "($self)")]
     pub fn start(&self, _py: Python<'_>) -> PyResult<()> {
         let peers = self.peers.clone();
@@ -70,6 +93,11 @@ impl SignalingServer {
         Ok(())
     }
 
+    /// Trigger image capture from connected clients.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - Optional specific client ID to capture from. If None, captures from all clients.
     #[pyo3(signature = (client_id=None))]
     #[pyo3(text_signature = "(self, client_id: Optional[str] = None) -> None")]
     pub fn capture(&self, client_id: Option<String>) -> PyResult<()> {
@@ -101,6 +129,16 @@ impl SignalingServer {
         Ok(())
     }
 
+    /// Send a message to a specific connected client.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - ID of the target client
+    /// * `message` - Message content to send
+    ///
+    /// # Returns
+    ///
+    /// True if the message was sent successfully, False otherwise.
     #[pyo3(text_signature = "(self, client_id: str, message: str) -> bool")]
     pub fn send_to_client(&self, client_id: String, message: String) -> PyResult<bool> {
         let peers = self.peers.clone();
@@ -118,6 +156,15 @@ impl SignalingServer {
         Ok(result)
     }
 
+    /// Check if a specific client is currently connected.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - ID of the client to check
+    ///
+    /// # Returns
+    ///
+    /// True if the client is connected, False otherwise.
     #[pyo3(text_signature = "(self, client_id: str) -> bool")]
     pub fn is_client_connected(&self, client_id: String) -> PyResult<bool> {
         let peers = self.peers.clone();
@@ -128,6 +175,11 @@ impl SignalingServer {
         Ok(is_connected)
     }
 
+    /// Get a list of all currently connected client IDs.
+    ///
+    /// # Returns
+    ///
+    /// A vector of client ID strings.
     #[pyo3(text_signature = "(self) -> List[str]")]
     pub fn get_connected_clients(&self) -> PyResult<Vec<String>> {
         let peers = self.peers.clone();
@@ -138,6 +190,15 @@ impl SignalingServer {
         Ok(clients)
     }
 
+    /// Disconnect a specific client from the server.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_id` - ID of the client to disconnect
+    ///
+    /// # Returns
+    ///
+    /// True if the client was disconnected, False if the client was not found.
     #[pyo3(text_signature = "(self, client_id: str) -> bool")]
     pub fn disconnect_client(&self, client_id: String) -> PyResult<bool> {
         let peers = self.peers.clone();
@@ -149,6 +210,11 @@ impl SignalingServer {
         Ok(was_removed)
     }
 
+    /// Check if the server is at capacity (2 or more clients).
+    ///
+    /// # Returns
+    ///
+    /// True if the server has reached its capacity limit.
     #[pyo3(text_signature = "(self) -> bool")]
     pub fn is_at_capacity(&self) -> PyResult<bool> {
         Python::with_gil(|py| {
@@ -157,6 +223,11 @@ impl SignalingServer {
         })
     }
 
+    /// Get the current server status information.
+    ///
+    /// # Returns
+    ///
+    /// A HashMap containing server status details including IP, port, and client count.
     #[pyo3(text_signature = "(self) -> int")]
     pub fn get_server_status(&self) -> PyResult<HashMap<String, String>> {
         let peers = self.peers.clone();
@@ -172,6 +243,11 @@ impl SignalingServer {
         Ok(status)
     }
 
+    /// Broadcast a message to all connected clients.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - Message content to broadcast
     #[pyo3(text_signature = "(self, message: str) -> None")]
     pub fn broadcast_message(&self, message: String, _py: Python<'_>) -> PyResult<()> {
         let peers = self.peers.clone();
@@ -190,6 +266,11 @@ impl SignalingServer {
         Ok(())
     }
 
+    /// Get the current number of connected clients.
+    ///
+    /// # Returns
+    ///
+    /// The number of currently connected clients.
     #[pyo3(text_signature = "($self)")]
     pub fn get_client_count(&self, _py: Python<'_>) -> PyResult<usize> {
         let peers = self.peers.clone();
@@ -200,6 +281,11 @@ impl SignalingServer {
         Ok(count)
     }
 
+    /// Get the last captured image data from clients.
+    ///
+    /// # Returns
+    ///
+    /// The last captured image as bytes, or None if no image has been captured.
     #[pyo3(text_signature = "(self) -> Optional[bytes]")]
     pub fn get_capture<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyBytes>>> {
         let last_image = self.last_captured_image.clone();
@@ -221,12 +307,26 @@ impl SignalingServer {
     }
 }
 
+/// Warp filter for injecting the peers map into request handlers.
+///
+/// This function creates a Warp filter that provides access to the shared
+/// peers map for WebSocket connection handling.
 fn with_peers(
     peers: Peers,
 ) -> impl Filter<Extract = (Peers,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || peers.clone())
 }
 
+/// Handle a new WebSocket connection from a client.
+///
+/// This function manages the lifecycle of a client connection, including
+/// message handling, image capture processing, and cleanup on disconnect.
+///
+/// # Arguments
+///
+/// * `ws` - The WebSocket connection
+/// * `peers` - Shared map of connected peers
+/// * `last_captured_image` - Shared storage for the last captured image
 async fn handle_connection(
     ws: WebSocket,
     peers: Peers,
@@ -246,11 +346,9 @@ async fn handle_connection(
                 if let Ok(text) = msg.to_str() {
                     println!("Received message from {}: {}", client_id, text);
 
-                    // Attempt to parse the message
                     let signaling_message: Result<SignalingMessage, _> = serde_json::from_str(text);
                     match signaling_message {
                         Ok(SignalingMessage::Image { data }) => {
-                            // Handle image message
                             println!("Handling image message from client {}", client_id);
                             handle_image_message(data.clone()).await;
 
@@ -264,7 +362,6 @@ async fn handle_connection(
                             }
                         }
                         Ok(message) => {
-                            // Handle other signaling messages
                             println!("Parsed signaling message: {:?}", message);
                             forward_message(&client_id, &message, &peers).await;
                         }
@@ -288,6 +385,13 @@ async fn handle_connection(
     println!("Client {} disconnected", client_id);
 }
 
+/// Process and save an image message from a client.
+///
+/// This function decodes base64 image data and saves it to a local file.
+///
+/// # Arguments
+///
+/// * `data` - Base64-encoded image data with data URL prefix
 async fn handle_image_message(data: String) {
     println!("Received image data of length: {}", data.len());
 
@@ -313,6 +417,15 @@ async fn handle_image_message(data: String) {
     }
 }
 
+/// Send an image capture trigger message to a specific client.
+///
+/// # Arguments
+///
+/// * `sender` - WebSocket sender for the target client
+///
+/// # Returns
+///
+/// Result indicating success or failure of the operation.
 async fn trigger_image_capture(
     sender: Arc<Mutex<SplitSink<WebSocket, Message>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -323,6 +436,13 @@ async fn trigger_image_capture(
     Ok(())
 }
 
+/// Forward a signaling message to all connected clients except the sender.
+///
+/// # Arguments
+///
+/// * `sender_id` - ID of the client who sent the message
+/// * `message` - The signaling message to forward
+/// * `peers` - Map of all connected peers
 async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Peers) {
     let serialized_message = match serde_json::to_string(message) {
         Ok(json) => json,
@@ -332,10 +452,10 @@ async fn forward_message(sender_id: &str, message: &SignalingMessage, peers: &Pe
         }
     };
 
-    let peers = peers.lock().await; // Await the async Mutex lock
+    let peers = peers.lock().await;
     for (client_id, client) in peers.iter() {
         if client_id != sender_id {
-            let mut client = client.lock().await; // Await the async Mutex lock
+            let mut client = client.lock().await;
             if let Err(e) = client.send(Message::text(serialized_message.clone())).await {
                 eprintln!("Error sending message to {}: {}", client_id, e);
             }

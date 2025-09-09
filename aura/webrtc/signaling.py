@@ -1,14 +1,19 @@
 import socket
-from aura import SignalingServer, VideoStreamer
+from aura import SignalingServer
 import sys
-import socket
 import signal
 import time
 from aura.camera import ProcessingPipeline, FaceNotFoundException
 import os
 import numpy as np
 import cv2
-from datetime import datetime
+from aura.webrtc import (
+    DEFAULT_SIGNALING_PORT,
+    DEFAULT_LOGS_DIR,
+    DEFAULT_VERBOSE_LEVEL,
+    CAPTURE_DELAY_SECONDS,
+    SERVER_SLEEP_SECONDS,
+)
 
 
 def get_free_port():
@@ -24,16 +29,14 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 
-def capture_images(server, output_dir="../logs", verbose=2):
+def capture_images(server, output_dir=DEFAULT_LOGS_DIR, verbose=DEFAULT_VERBOSE_LEVEL):
     """Capture, process, and save images with face detection"""
     os.makedirs(output_dir, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     pipeline = ProcessingPipeline(log_path=output_dir, verbose=verbose)
 
     server.capture()
-    time.sleep(2)
+    time.sleep(CAPTURE_DELAY_SECONDS)
 
     image_bytes = server.get_capture()
     if image_bytes:
@@ -41,13 +44,13 @@ def capture_images(server, output_dir="../logs", verbose=2):
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         try:
-            annotated_image = pipeline.annotate_face(image)
-            processed_face = pipeline.process_image(image)
+            pipeline.annotate_face(image)
+            pipeline.process_image(image)
 
             # TODO: Send processed face to the model
 
         except FaceNotFoundException:
-            print(f"No face detected in captured image.")
+            print("No face detected in captured image.")
         except Exception as e:
             print(f"Error processing image: {str(e)}")
     else:
@@ -57,7 +60,7 @@ def capture_images(server, output_dir="../logs", verbose=2):
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
-    port = 3030
+    port = DEFAULT_SIGNALING_PORT
 
     server = SignalingServer(port=port)
     server.start()
@@ -67,9 +70,9 @@ def main():
 
     try:
         while True:
-            time.sleep(10)
+            time.sleep(SERVER_SLEEP_SECONDS)
             capture_images(server)
-            time.sleep(10)
+            time.sleep(SERVER_SLEEP_SECONDS)
     except KeyboardInterrupt:
         print("\nShutting down signaling server...")
 
