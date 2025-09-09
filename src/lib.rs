@@ -1,3 +1,14 @@
+//! # Aura WebRTC Library
+//!
+//! A Rust library providing WebRTC signaling server and video streaming capabilities
+//! for real-time communication applications.
+//!
+//! ## Features
+//!
+//! - **SignalingServer**: WebSocket-based signaling server for WebRTC peer connections
+//! - **VideoStreamer**: Real-time video streaming with IVF file support
+//! - **SignalingMessage**: Comprehensive message types for WebRTC signaling
+
 use pyo3::prelude::*;
 
 mod server;
@@ -6,41 +17,20 @@ pub use signaling_types::SignalingMessage;
 
 mod streamer;
 
+#[cfg(test)]
+mod tests;
+
 use server::SignalingServer;
 use streamer::VideoStreamer;
 
+/// Python module initialization for the Aura WebRTC library.
+///
+/// This function registers the main classes with the Python interpreter:
+/// - `SignalingServer`: For managing WebRTC signaling connections
+/// - `VideoStreamer`: For streaming video content via WebRTC
 #[pymodule]
 fn aura(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SignalingServer>()?;
     m.add_class::<VideoStreamer>()?;
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_server_creation() {
-        let server = SignalingServer::new(Some(3031), Some("127.0.0.1".to_string()));
-        assert_eq!(server.port, 3031);
-        assert_eq!(server.ip, "127.0.0.1");
-    }
-
-    #[test]
-    fn test_server_default_values() {
-        let server = SignalingServer::new(None, None);
-        assert_eq!(server.port, 3030);
-        assert_eq!(server.ip, "127.0.0.1");
-    }
-
-    #[test]
-    fn test_message_serialization() {
-        let offer = SignalingMessage::Offer {
-            sdp: "test_sdp".to_string(),
-        };
-        let serialized = serde_json::to_string(&offer).unwrap();
-        assert!(serialized.contains("offer"));
-        assert!(serialized.contains("test_sdp"));
-    }
 }

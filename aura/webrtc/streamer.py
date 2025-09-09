@@ -1,8 +1,9 @@
-import socket
-import sys
 import signal
+import sys
 import time
+
 from aura import VideoStreamer
+from aura.webrtc import DEFAULT_WS_IP, DEFAULT_WS_PORT, DEFAULT_IVF_DIR
 
 
 def signal_handler(sig, frame):
@@ -14,9 +15,9 @@ def signal_handler(sig, frame):
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
-    ws_ip = "127.0.0.1"  # WebSocket IP address
-    ws_port = 3030  # WebSocket port
-    ivf_dir = "./ivf_files"  # Match RustWebRTC directory structure
+    ws_ip = DEFAULT_WS_IP
+    ws_port = DEFAULT_WS_PORT
+    ivf_dir = DEFAULT_IVF_DIR
 
     streamer = VideoStreamer(ws_ip, ws_port, ivf_dir)
     streamer.start_streaming()

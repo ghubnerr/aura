@@ -26,3 +26,6 @@ base64 = "0.22.1"
 
 [dev.dependencies]
 tokio-tungstenite = { version = "0.24.0", features = ["native-tls"] }
+tokio-test = "0.4"
+tempfile = "3.0"
+mockall = "0.12"
