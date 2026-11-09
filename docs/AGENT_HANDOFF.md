@@ -28,6 +28,6 @@ Use **PR #43 comments** for status so both agents can read without a direct DM A
 
 ## Success criteria (MVP)
 
-1. Browser on LAN sees camera + remote art track (emotion stub IVF) ✅ plumbing
+1. Browser on LAN sees camera + remote art track (emotion stub IVF)
 2. Face capture → emotion embedding → live IVF swap
 3. Next: replace stub publisher with StreamDiffusionV2/Krea realtime on the 5060 Ti

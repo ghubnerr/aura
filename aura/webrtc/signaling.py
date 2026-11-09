@@ -46,7 +46,7 @@ def _process_capture(server: SignalingServer, output_dir: str, verbose: int) -> 
 
 
 def _handle_processed_face(processed_face: np.ndarray, output_dir: str) -> None:
-    """Persist the face crop and update the live emotion-conditioned art."""
+    """Classify emotion from the face crop and update the live art stream."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(output_dir, f"face_{stamp}.npy")
     np.save(out_path, processed_face)

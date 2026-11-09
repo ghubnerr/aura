@@ -1,14 +1,15 @@
 /**
  * Browser WebRTC client for Aura.
  *
- * Signaling host defaults to the page hostname. Override with ?signaling=host:port.
  * On HTTPS pages the client uses wss:// automatically (point at the WSS proxy).
+ * Override host with ?signaling=host:port — e.g. 192.168.1.200:3031
  */
 (function () {
   const params = new URLSearchParams(window.location.search);
   const signalingParam = params.get("signaling");
   const defaultHost = window.location.hostname || "127.0.0.1";
-  const signalingTarget = signalingParam || `${defaultHost}:3030`;
+  const defaultPort = window.location.protocol === "https:" ? "3031" : "3030";
+  const signalingTarget = signalingParam || `${defaultHost}:${defaultPort}`;
   const forcePlain = params.get("tls") === "0";
   const useTls =
     !forcePlain &&
@@ -20,6 +21,7 @@
   const remoteVideo = document.getElementById("remoteVideo");
   const capturedImage = document.getElementById("capturedImage");
   const statusEl = document.getElementById("status");
+  const emotionEl = document.getElementById("emotion");
 
   const signalingSocket = new WebSocket(signalingUrl);
   const pc = new RTCPeerConnection({
@@ -27,9 +29,7 @@
   });
 
   function setStatus(text) {
-    if (statusEl) {
-      statusEl.textContent = text;
-    }
+    if (statusEl) statusEl.textContent = text;
     console.log(text);
   }
 
@@ -46,7 +46,6 @@
       console.warn("Local video not ready for capture");
       return;
     }
-
     const canvas = document.createElement("canvas");
     canvas.width = localVideo.videoWidth;
     canvas.height = localVideo.videoHeight;
@@ -55,9 +54,9 @@
       console.error("Failed to get canvas context");
       return;
     }
-
     context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
     const imageData = canvas.toDataURL("image/png");
+    // Keep capture preview small/secondary — art stream is the product.
     capturedImage.src = imageData;
     capturedImage.style.display = "block";
     sendMessage({ type: "image", data: imageData });
@@ -110,9 +109,7 @@
   };
 
   pc.onicecandidate = ({ candidate }) => {
-    if (!candidate) {
-      return;
-    }
+    if (!candidate) return;
     sendMessage({
       type: "candidate",
       candidate: candidate.candidate,
@@ -125,9 +122,7 @@
     const data = JSON.parse(message.data);
 
     if (data.type === "candidate") {
-      if (data.candidate == null) {
-        return;
-      }
+      if (data.candidate == null) return;
       try {
         await pc.addIceCandidate(
           new RTCIceCandidate({
