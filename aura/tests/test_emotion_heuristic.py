@@ -9,8 +9,8 @@ from aura.inference.emotion_heuristic import heuristic_emotion
 
 def test_warm_bright_face_is_happy():
     face = np.zeros((64, 64, 3), dtype=np.uint8)
-    # Uniform warm/bright BGR — low contrast so anger branch does not win.
-    face[:] = (60, 140, 210)
+    # Uniform warm/bright BGR (brightness > 145, warmth > 18).
+    face[:] = (80, 160, 230)
     assert heuristic_emotion(face) == "happy"
 
 
