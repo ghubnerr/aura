@@ -34,6 +34,9 @@ Hard-refresh the browser (Ctrl+Shift+R). After **Start Call**, the large left pa
 
 ## Success criteria
 
-1. Start Call → continuous abstract art on the left (not your face)
-2. Capture Face → emotion label updates; art palette/motion changes
+1. Start Call → continuous labeled emotion stub on the left (not your face)
+2. Capture Face → status shows emotion within ~1s; art label/colors change
 3. Next: replace stub IVF publisher with StreamDiffusionV2/Krea on the 5060 Ti
+
+Note: current art is **placeholder gradients** with the emotion name burned in —
+not the trained generative model yet.

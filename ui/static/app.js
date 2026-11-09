@@ -77,7 +77,7 @@
     const imageData = canvas.toDataURL("image/png");
     capturedImage.src = imageData;
     capturedImage.style.display = "block";
-    setEmotion("classifying…");
+    setEmotion("sending…");
     sendMessage({ type: "image", data: imageData });
   }
 
@@ -187,8 +187,12 @@
       captureFrame();
     }
 
-    if (data.type === "emotion" && data.emotion) {
-      setEmotion(data.emotion);
+    if (data.type === "emotion") {
+      if (data.error) {
+        setEmotion(`${data.emotion} (${data.error})`);
+      } else if (data.emotion) {
+        setEmotion(data.emotion);
+      }
     }
   };
 

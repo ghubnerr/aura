@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import signal
 import sys
@@ -17,40 +18,46 @@ from aura.camera import FaceNotFoundException, ProcessingPipeline
 from aura.config import CONFIG
 
 
-def _process_capture(server: SignalingServer, output_dir: str, verbose: int) -> None:
-    """Ask clients for a frame, crop the face, and publish emotion art."""
+def _broadcast_emotion(server: SignalingServer, emotion: str, error: str | None = None) -> None:
+    import json
+
+    payload = {"type": "emotion", "emotion": emotion}
+    if error:
+        payload["error"] = error
+    try:
+        server.broadcast_message(json.dumps(payload))
+    except Exception as exc:  # noqa: BLE001
+        print(f"Emotion broadcast skipped: {exc}")
+
+
+def _process_image_bytes(
+    server: SignalingServer,
+    image_bytes: bytes,
+    output_dir: str,
+    verbose: int,
+) -> None:
+    """Classify one captured PNG/JPEG and publish matching art."""
     os.makedirs(output_dir, exist_ok=True)
     pipeline = ProcessingPipeline(log_path=output_dir, verbose=verbose)
-
-    server.capture()
-    time.sleep(2)
-
-    image_bytes = server.get_capture()
-    if not image_bytes:
-        print("No image captured")
-        return
 
     image = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
     if image is None:
         print("Failed to decode captured image")
+        _broadcast_emotion(server, "unknown", error="decode_failed")
         return
 
     try:
         pipeline.annotate_face(image)
         processed_face = pipeline.process_image(image)
-        _handle_processed_face(server, processed_face, output_dir)
     except FaceNotFoundException:
         print("No face detected in captured image.")
+        _broadcast_emotion(server, "none", error="no_face")
+        return
     except Exception as exc:  # noqa: BLE001 - keep server loop alive
         print(f"Error processing image: {exc}")
+        _broadcast_emotion(server, "unknown", error=str(exc))
+        return
 
-
-def _handle_processed_face(
-    server: SignalingServer,
-    processed_face: np.ndarray,
-    output_dir: str,
-) -> None:
-    """Classify emotion from the face crop and update the live art stream."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(output_dir, f"face_{stamp}.npy")
     np.save(out_path, processed_face)
@@ -60,10 +67,7 @@ def _handle_processed_face(
 
     runtime = EmotionArtRuntime.get_shared()
     runtime.update_from_face(processed_face)
-    try:
-        server.broadcast_message(runtime.emotion_message())
-    except Exception as exc:  # noqa: BLE001
-        print(f"Emotion broadcast skipped: {exc}")
+    _broadcast_emotion(server, runtime.last_emotion or "unknown")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -83,7 +87,13 @@ def main(argv: list[str] | None = None) -> None:
         "--capture-interval",
         type=float,
         default=10.0,
-        help="Seconds between automatic face captures",
+        help="Seconds between automatic face-capture triggers",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=0.5,
+        help="How often to check for a newly arrived capture",
     )
     parser.add_argument(
         "--log-dir",
@@ -114,10 +124,27 @@ def main(argv: list[str] | None = None) -> None:
     except Exception as exc:  # noqa: BLE001
         print(f"Could not seed initial IVF art: {exc}")
 
+    last_hash: str | None = None
+    last_trigger = 0.0
+
     try:
         while True:
-            time.sleep(args.capture_interval)
-            _process_capture(server, args.log_dir, verbose=2)
+            now = time.time()
+            # Ask browsers for a fresh frame on an interval.
+            if now - last_trigger >= args.capture_interval:
+                server.capture()
+                last_trigger = now
+
+            image_bytes = server.get_capture()
+            if image_bytes:
+                digest = hashlib.sha1(image_bytes).hexdigest()
+                if digest != last_hash:
+                    last_hash = digest
+                    print(f"New capture ({len(image_bytes)} bytes) — classifying")
+                    _broadcast_emotion(server, "classifying")
+                    _process_image_bytes(server, image_bytes, args.log_dir, verbose=2)
+
+            time.sleep(args.poll_interval)
     except KeyboardInterrupt:
         print("\nShutting down signaling server...")
 
