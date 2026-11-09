@@ -23,6 +23,11 @@
   const statusEl = document.getElementById("status");
   const emotionEl = document.getElementById("emotion");
 
+  // Autoplay policies: muted remote video can start without a gesture.
+  remoteVideo.muted = true;
+  remoteVideo.setAttribute("playsinline", "true");
+  remoteVideo.setAttribute("autoplay", "true");
+
   const signalingSocket = new WebSocket(signalingUrl);
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -33,12 +38,26 @@
     console.log(text);
   }
 
+  function setEmotion(text) {
+    if (!emotionEl) return;
+    emotionEl.innerHTML = `Emotion: <strong>${text}</strong>`;
+  }
+
   function sendMessage(data) {
     if (signalingSocket.readyState !== WebSocket.OPEN) {
       console.error("WebSocket is not open. Cannot send message:", data);
       return;
     }
     signalingSocket.send(JSON.stringify(data));
+  }
+
+  async function playRemote() {
+    try {
+      await remoteVideo.play();
+    } catch (err) {
+      console.warn("remoteVideo.play() blocked:", err);
+      setStatus("Tap the page once if art is paused (autoplay)");
+    }
   }
 
   function captureFrame() {
@@ -56,9 +75,9 @@
     }
     context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
     const imageData = canvas.toDataURL("image/png");
-    // Keep capture preview small/secondary — art stream is the product.
     capturedImage.src = imageData;
     capturedImage.style.display = "block";
+    setEmotion("classifying…");
     sendMessage({ type: "image", data: imageData });
   }
 
@@ -101,7 +120,7 @@
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       sendMessage({ type: "offer", sdp: offer.sdp });
-      setStatus("Sent offer");
+      setStatus("Sent offer — waiting for art track");
     } catch (error) {
       console.error(error);
       setStatus(`Camera/WebRTC error: ${error.message || error}`);
@@ -118,11 +137,15 @@
     });
   };
 
+  pc.onconnectionstatechange = () => {
+    setStatus(`WebRTC: ${pc.connectionState}`);
+  };
+
   signalingSocket.onmessage = async (message) => {
     const data = JSON.parse(message.data);
 
     if (data.type === "candidate") {
-      if (data.candidate == null) return;
+      if (data.candidate == null || data.candidate === "") return;
       try {
         await pc.addIceCandidate(
           new RTCIceCandidate({
@@ -153,7 +176,7 @@
     if (data.type === "answer") {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(data));
-        setStatus("Remote answer applied");
+        setStatus("Remote answer applied — waiting for art frames");
       } catch (error) {
         console.error("Error setting remote description from answer", error);
       }
@@ -163,15 +186,19 @@
     if (data.type === "triggerimagecapture") {
       captureFrame();
     }
-  };
 
-  pc.ontrack = (event) => {
-    if (!remoteVideo.srcObject) {
-      remoteVideo.srcObject = event.streams[0];
-      setStatus("Receiving remote art stream");
+    if (data.type === "emotion" && data.emotion) {
+      setEmotion(data.emotion);
     }
   };
 
+  pc.ontrack = (event) => {
+    const stream = event.streams[0] || new MediaStream([event.track]);
+    remoteVideo.srcObject = stream;
+    setStatus("Receiving remote art stream");
+    playRemote();
+    event.track.onunmute = () => playRemote();
+  };
+
   document.getElementById("captureImage").addEventListener("click", captureFrame);
-  setStatus(`Connecting to ${signalingUrl}…`);
 })();

@@ -4,9 +4,19 @@
 **Branch / PR:** `cursor/cleanup-modernize-1aa4` → https://github.com/ghubnerr/aura/pull/43  
 **Windows worker:** `Gabes-PC` (`c:\Users\gabri\Projects\aura`) @ `192.168.1.200`
 
-Cloud inbound TCP is blocked, so **WebRTC host + GPU work run on Windows**. Cloud owns repo cleanup, architecture, and PR iteration.
+## Critical fix (pull this)
 
-## Live host commands (current)
+Streamer previously **waited for a file Modify** before sending any frames, and **stopped at IVF EOF**. That left the browser with an empty remote track — users only saw their webcam / face capture.
+
+Now the streamer:
+1. Seeds from existing `ivf_files/live.ivf` immediately
+2. Loops frames from memory forever
+3. Reloads when emotion publish replaces `live.ivf`
+4. Trickles ICE candidates back to the browser
+
+**Must rebuild Rust:** `maturin develop`
+
+## Live host commands
 
 ```bat
 git pull origin cursor/cleanup-modernize-1aa4
@@ -20,14 +30,10 @@ python scripts/serve_ui_https.py
 
 Open: `https://192.168.1.200:8443/?signaling=192.168.1.200:3031`
 
-Emotion captures publish `docs/samples/emotions/<emotion>.ivf` → `ivf_files/live.ivf`.
+Hard-refresh the browser (Ctrl+Shift+R). After **Start Call**, the large left panel is the art stream; the small right panel is your camera.
 
-## Shared mailbox
+## Success criteria
 
-Use **PR #43 comments** for status so both agents can read without a direct DM API.
-
-## Success criteria (MVP)
-
-1. Browser on LAN sees camera + remote art track (emotion stub IVF)
-2. Face capture → emotion embedding → live IVF swap
-3. Next: replace stub publisher with StreamDiffusionV2/Krea realtime on the 5060 Ti
+1. Start Call → continuous abstract art on the left (not your face)
+2. Capture Face → emotion label updates; art palette/motion changes
+3. Next: replace stub IVF publisher with StreamDiffusionV2/Krea on the 5060 Ti

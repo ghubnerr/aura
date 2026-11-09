@@ -3,50 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aura WebRTC</title>
+    <title>Aura</title>
     <style>
         :root {
             color-scheme: dark;
-            --bg: #0f1419;
-            --panel: #1a222c;
+            --bg: #0b1016;
+            --panel: #151c24;
             --text: #e7eef7;
             --muted: #9db0c5;
             --accent: #3dd6c6;
         }
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: "Segoe UI", "Helvetica Neue", sans-serif;
-            background: radial-gradient(circle at top, #1b2735, var(--bg));
+            background:
+                radial-gradient(ellipse at 20% 0%, #1a2a38 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, #142018 0%, transparent 45%),
+                var(--bg);
             color: var(--text);
             min-height: 100vh;
-            padding: 24px;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 12px 20px;
+            margin-bottom: 12px;
         }
         h1 {
-            margin: 0 0 8px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
+            margin: 0;
+            font-weight: 650;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 1.4rem;
         }
-        #status {
+        #status, #emotion {
             color: var(--muted);
-            margin-bottom: 16px;
+            font-size: 0.95rem;
         }
-        .videos {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-            margin-bottom: 16px;
-        }
-        video, img {
-            width: 100%;
-            background: var(--panel);
-            border-radius: 8px;
-            aspect-ratio: 4 / 3;
-            object-fit: cover;
-        }
-        #capturedImage {
-            display: none;
-            border: 1px solid #334155;
-        }
+        #emotion strong { color: var(--accent); font-weight: 600; }
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -66,23 +63,92 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+        .stage {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+        }
+        @media (min-width: 900px) {
+            .stage {
+                grid-template-columns: minmax(0, 2.2fr) minmax(180px, 0.8fr);
+                align-items: start;
+            }
+        }
+        .art-panel, .side-panel {
+            position: relative;
+        }
+        .label {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            z-index: 2;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #d7e7f7;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        #remoteVideo {
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            background: #05080c;
+            border-radius: 10px;
+            object-fit: cover;
+            display: block;
+        }
+        .side-panel video,
+        .side-panel img {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: var(--panel);
+            border-radius: 8px;
+            object-fit: cover;
+            display: block;
+            margin-bottom: 8px;
+        }
+        #capturedImage {
+            display: none;
+            opacity: 0.85;
+            border: 1px solid #334155;
+        }
+        .hint {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-top: 8px;
+            max-width: 52rem;
+        }
     </style>
 </head>
 <body>
-    <h1>Aura</h1>
-    <div id="status">Connecting to signaling…</div>
+    <header>
+        <h1>Aura</h1>
+        <div id="status">Connecting to signaling…</div>
+        <div id="emotion">Emotion: <strong>—</strong></div>
+    </header>
 
     <div class="controls">
         <button id="startCall" disabled>Start Call</button>
         <button id="captureImage" disabled>Capture Face</button>
     </div>
 
-    <div class="videos">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideo" autoplay playsinline></video>
+    <div class="stage">
+        <div class="art-panel">
+            <span class="label">Art stream</span>
+            <video id="remoteVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="side-panel">
+            <span class="label">You</span>
+            <video id="localVideo" autoplay muted playsinline></video>
+            <img id="capturedImage" alt="Last face capture" />
+        </div>
     </div>
 
-    <img id="capturedImage" alt="Captured frame" />
+    <p class="hint">
+        After Start Call you should see abstract art on the left. Face captures
+        only change the art mood — they are not the product stream.
+    </p>
 
     <script src="app.js"></script>
 </body>

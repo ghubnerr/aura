@@ -59,7 +59,10 @@ class EmotionArtGenerator:
         resolved = self.resolve_emotion(emotion)
         if not force and resolved == self.last_emotion and self.last_path:
             # Still touch so a late-joining streamer can pick it up.
-            os.utime(self.last_path, None)
+            try:
+                os.utime(self.last_path, None)
+            except OSError:
+                pass
             return self.last_path
 
         source = self.sample_dir / f"{resolved}.ivf"
@@ -74,11 +77,29 @@ class EmotionArtGenerator:
         dest = self.ivf_dir / self.live_name
         tmp = self.ivf_dir / f".{self.live_name}.tmp"
         shutil.copy2(source, tmp)
-        os.replace(tmp, dest)
+
+        # Windows may keep live.ivf locked briefly while the streamer reads it.
+        last_err: Optional[Exception] = None
+        for attempt in range(12):
+            try:
+                os.replace(tmp, dest)
+                break
+            except PermissionError as exc:
+                last_err = exc
+                time.sleep(0.05 * (attempt + 1))
+        else:
+            if last_err is not None:
+                raise last_err
+            raise PermissionError(f"Could not replace {dest}")
+
         now = time.time()
-        os.utime(dest, (now, now))
+        try:
+            os.utime(dest, (now, now))
+        except OSError:
+            pass
 
         self.last_emotion = resolved
         self.last_path = dest
-        print(f"Art generator: published {resolved} → {dest}")
+        # ASCII-only: Windows consoles often use cp1252.
+        print(f"Art generator: published {resolved} -> {dest}")
         return dest

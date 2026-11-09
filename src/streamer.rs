@@ -3,6 +3,7 @@
 use crate::SignalingMessage;
 
 use anyhow::{anyhow, Result};
+use bytes::Bytes;
 use futures_util::{SinkExt, StreamExt};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use pyo3::prelude::*;
@@ -28,6 +29,17 @@ use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_sample::TrackLocalStaticSample;
 use webrtc::track::track_local::TrackLocal;
+
+type WsWrite = Arc<
+    Mutex<
+        futures_util::stream::SplitSink<
+            tokio_tungstenite::WebSocketStream<
+                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+            >,
+            Message,
+        >,
+    >,
+>;
 
 /// Python-facing IVF → WebRTC streamer.
 #[pyclass]
@@ -169,6 +181,30 @@ async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
         },
     ));
 
+    // Trickle ICE back to the browser — without this, remote video often stays
+    // blank when the peers are not on the exact same host.
+    let write_ice = Arc::clone(&write);
+    peer_connection.on_ice_candidate(Box::new(move |candidate| {
+        let write_ice = Arc::clone(&write_ice);
+        Box::pin(async move {
+            let Some(candidate) = candidate else {
+                return;
+            };
+            let Ok(init) = candidate.to_json() else {
+                return;
+            };
+            let msg = SignalingMessage::Candidate {
+                candidate: init.candidate,
+                sdp_mid: init.sdp_mid,
+                sdp_mline_index: init.sdp_mline_index.map(|idx| idx as u32),
+            };
+            if let Ok(text) = serde_json::to_string(&msg) {
+                let mut write = write_ice.lock().await;
+                let _ = write.send(Message::Text(text)).await;
+            }
+        })
+    }));
+
     let write_clone = Arc::clone(&write);
     tokio::spawn(async move {
         while let Some(msg) = read.next().await {
@@ -193,12 +229,7 @@ async fn start_webrtc(ws_ip: &str, ws_port: u16, ivf_dir: &str) -> Result<()> {
 async fn handle_signal(
     signal: SignalingMessage,
     pc: &Arc<webrtc::peer_connection::RTCPeerConnection>,
-    write: &Arc<Mutex<futures_util::stream::SplitSink<
-        tokio_tungstenite::WebSocketStream<
-            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-        >,
-        Message,
-    >>>,
+    write: &WsWrite,
 ) -> Result<()> {
     match signal {
         SignalingMessage::Offer { sdp } => {
@@ -234,31 +265,111 @@ async fn handle_signal(
     Ok(())
 }
 
-async fn write_video_to_track(path: &str, track: Arc<TrackLocalStaticSample>) -> Result<()> {
+/// Load all VP8 frames from an IVF file into memory so the file handle can be
+/// released (Windows cannot replace a file the streamer still holds open).
+fn load_ivf_frames(path: &Path) -> Result<(Vec<Bytes>, Duration)> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let (mut ivf, header) = IVFReader::new(reader)?;
 
     if header.timebase_denominator == 0 {
-        return Err(anyhow!("invalid IVF timebase in {}", path));
+        return Err(anyhow!("invalid IVF timebase in {}", path.display()));
     }
 
-    let sleep_time = Duration::from_millis(
-        ((1000 * header.timebase_numerator) / header.timebase_denominator) as u64,
+    let frame_duration = Duration::from_millis(
+        ((1000 * header.timebase_numerator) / header.timebase_denominator).max(1) as u64,
     );
-    let mut ticker = tokio::time::interval(sleep_time);
+
+    let mut frames = Vec::new();
+    loop {
+        match ivf.parse_next_frame() {
+            Ok((frame, _)) => frames.push(frame.freeze()),
+            Err(_) => break,
+        }
+    }
+
+    if frames.is_empty() {
+        return Err(anyhow!("no frames in {}", path.display()));
+    }
+
+    Ok((frames, frame_duration))
+}
+
+/// Loop an IVF clip forever until the caller cancels via `tokio::select!`.
+async fn loop_ivf_to_track(path: &Path, track: Arc<TrackLocalStaticSample>) -> Result<()> {
+    let (frames, frame_duration) = load_ivf_frames(path)?;
+    println!(
+        "Streaming {} ({} frames, {:?}/frame) — looping until replaced",
+        path.display(),
+        frames.len(),
+        frame_duration
+    );
+
+    let mut ticker = tokio::time::interval(frame_duration);
+    // Skip the immediate first tick so we don't burst two frames at start.
+    ticker.tick().await;
 
     loop {
-        let frame = ivf.parse_next_frame()?.0;
-        track
-            .write_sample(&Sample {
-                data: frame.freeze(),
-                duration: Duration::from_secs(1),
-                ..Default::default()
-            })
-            .await?;
-        ticker.tick().await;
+        for frame in &frames {
+            track
+                .write_sample(&Sample {
+                    data: frame.clone(),
+                    duration: frame_duration,
+                    ..Default::default()
+                })
+                .await?;
+            ticker.tick().await;
+        }
     }
+}
+
+fn pick_ivf(directory: &Path) -> Option<PathBuf> {
+    let live = directory.join("live.ivf");
+    if live.is_file() {
+        return Some(live);
+    }
+
+    let mut candidates: Vec<PathBuf> = std::fs::read_dir(directory)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("ivf"))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| !name.starts_with('.'))
+                .unwrap_or(false)
+        })
+        .collect();
+
+    candidates.sort();
+    candidates.pop()
+}
+
+fn path_from_event(event: &Event) -> Option<PathBuf> {
+    match event.kind {
+        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Any => {}
+        // Windows replace often surfaces as Remove + Create / Rename.
+        EventKind::Remove(_) => return None,
+        _ => {
+            // Some backends report Rename under Other / Access — still inspect paths.
+        }
+    }
+
+    event.paths.iter().find_map(|path| {
+        if path.extension().and_then(|ext| ext.to_str()) != Some("ivf") {
+            return None;
+        }
+        let name = path.file_name()?.to_str()?;
+        if name.starts_with('.') || name.ends_with(".tmp") {
+            return None;
+        }
+        if path.is_file() {
+            Some(path.clone())
+        } else {
+            None
+        }
+    })
 }
 
 async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSample>) -> Result<()> {
@@ -267,11 +378,13 @@ async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSamp
         std::fs::create_dir_all(&dir)?;
     }
 
-    let (tx, mut rx) = mpsc::channel(100);
+    let (tx, mut rx) = mpsc::channel::<PathBuf>(16);
     let mut watcher = RecommendedWatcher::new(
         move |res| {
             if let Ok(event) = res {
-                let _ = tx.blocking_send(event);
+                if let Some(path) = path_from_event(&event) {
+                    let _ = tx.blocking_send(path);
+                }
             }
         },
         Config::default(),
@@ -280,25 +393,50 @@ async fn watch_and_stream_video(directory: &str, track: Arc<TrackLocalStaticSamp
     watcher.watch(Path::new(directory), RecursiveMode::NonRecursive)?;
     println!("Watching directory: {}", directory);
 
-    while let Some(event) = rx.recv().await {
-        let Event {
-            kind: EventKind::Modify(_),
-            paths,
-            ..
-        } = event
-        else {
-            continue;
-        };
+    let mut current = pick_ivf(&dir);
+    if let Some(ref path) = current {
+        println!("Seeding stream from existing file: {}", path.display());
+    } else {
+        println!("No IVF yet in {} — waiting for publish", directory);
+    }
 
-        for path in paths {
-            if path.extension().and_then(|ext| ext.to_str()) != Some("ivf") {
-                continue;
+    loop {
+        match current.clone() {
+            Some(path) => {
+                tokio::select! {
+                    result = loop_ivf_to_track(&path, Arc::clone(&track)) => {
+                        if let Err(err) = result {
+                            eprintln!("Error streaming {}: {}", path.display(), err);
+                            // Wait for a replacement rather than spinning on a bad file.
+                            if let Some(next) = rx.recv().await {
+                                println!("Detected change in file: {:?}", next);
+                                current = Some(next);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    next = rx.recv() => {
+                        let Some(mut next) = next else { break; };
+                        println!("Detected change in file: {:?}", next);
+                        // Debounce bursty Windows FS events; always restart so a
+                        // same-path replace (live.ivf) reloads emotion frames.
+                        while let Ok(more) = rx.try_recv() {
+                            println!("Detected change in file: {:?}", more);
+                            next = more;
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        current = Some(next);
+                    }
+                }
             }
-            println!("Detected change in file: {:?}", path);
-            if let Err(err) = write_video_to_track(path.to_string_lossy().as_ref(), Arc::clone(&track))
-                .await
-            {
-                println!("Error streaming video: {}", err);
+            None => {
+                if let Some(next) = rx.recv().await {
+                    println!("Detected new IVF: {:?}", next);
+                    current = Some(next);
+                } else {
+                    break;
+                }
             }
         }
     }

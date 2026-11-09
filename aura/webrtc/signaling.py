@@ -1,4 +1,4 @@
-"""Run the Aura signaling server and drive emotion → art updates."""
+"""Run the Aura signaling server and drive emotion -> art updates."""
 
 from __future__ import annotations
 
@@ -38,14 +38,18 @@ def _process_capture(server: SignalingServer, output_dir: str, verbose: int) -> 
     try:
         pipeline.annotate_face(image)
         processed_face = pipeline.process_image(image)
-        _handle_processed_face(processed_face, output_dir)
+        _handle_processed_face(server, processed_face, output_dir)
     except FaceNotFoundException:
         print("No face detected in captured image.")
     except Exception as exc:  # noqa: BLE001 - keep server loop alive
         print(f"Error processing image: {exc}")
 
 
-def _handle_processed_face(processed_face: np.ndarray, output_dir: str) -> None:
+def _handle_processed_face(
+    server: SignalingServer,
+    processed_face: np.ndarray,
+    output_dir: str,
+) -> None:
     """Classify emotion from the face crop and update the live art stream."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(output_dir, f"face_{stamp}.npy")
@@ -54,7 +58,12 @@ def _handle_processed_face(processed_face: np.ndarray, output_dir: str) -> None:
 
     from aura.inference.runtime import EmotionArtRuntime
 
-    EmotionArtRuntime.get_shared().update_from_face(processed_face)
+    runtime = EmotionArtRuntime.get_shared()
+    runtime.update_from_face(processed_face)
+    try:
+        server.broadcast_message(runtime.emotion_message())
+    except Exception as exc:  # noqa: BLE001
+        print(f"Emotion broadcast skipped: {exc}")
 
 
 def main(argv: list[str] | None = None) -> None:

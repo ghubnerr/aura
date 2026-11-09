@@ -37,11 +37,20 @@ def main(argv: list[str] | None = None) -> None:
 
     signal.signal(signal.SIGINT, _shutdown)
 
+    # Ensure live.ivf exists before the Rust watcher starts, so the first
+    # peer connection already has frames to send.
+    try:
+        from aura.inference.art_generator import EmotionArtGenerator
+
+        EmotionArtGenerator(ivf_dir=args.ivf_dir).publish("neutral", force=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Could not seed IVF before stream start: {exc}")
+
     streamer = VideoStreamer(args.signaling_host, args.signaling_port, args.ivf_dir)
     streamer.start_streaming()
 
     print(
-        "Video streamer started — joining "
+        "Video streamer started - joining "
         f"ws://{args.signaling_host}:{args.signaling_port}/signaling"
     )
     print(f"Watching directory: {args.ivf_dir}")

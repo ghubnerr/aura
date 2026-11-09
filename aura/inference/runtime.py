@@ -92,3 +92,14 @@ class EmotionArtRuntime:
             print(f"Art publish skipped: {exc}")
 
         return self.last_embedding
+
+    def emotion_message(self) -> str:
+        """JSON the browser understands for the emotion status line."""
+        import json
+
+        return json.dumps(
+            {
+                "type": "emotion",
+                "emotion": self.last_emotion or "unknown",
+            }
+        )

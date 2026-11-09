@@ -49,7 +49,7 @@ async def run_proxy(host: str, port: int, upstream: str, cert_dir: Path) -> None
     async def handler(websocket):
         await _handler(websocket, upstream)
 
-    print(f"WSS proxy on wss://{host}:{port}/ … → {upstream}")
+    print(f"WSS proxy on wss://{host}:{port}/ -> {upstream}")
     print(f"TLS cert: {cert}")
     async with websockets.serve(handler, host, port, ssl=ssl_ctx, max_size=None):
         await asyncio.Future()
