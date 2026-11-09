@@ -7,12 +7,15 @@ import numpy as np
 
 def heuristic_emotion(face_bgr_u8: np.ndarray) -> str:
     """Guess a mood label from mean color / contrast of a BGR face crop."""
-    mean = face_bgr_u8.reshape(-1, 3).mean(axis=0)
+    pixels = face_bgr_u8.reshape(-1, 3).astype(np.float32)
+    mean = pixels.mean(axis=0)
     b, g, r = (float(x) for x in mean)
     brightness = (r + g + b) / 3.0
     warmth = r - b
     greenness = g - (r + b) / 2.0
-    contrast = float(face_bgr_u8.std())
+    # Luma spatial contrast (ignore channel spread on a flat patch).
+    luma = pixels @ np.array([0.114, 0.587, 0.299], dtype=np.float32)
+    contrast = float(luma.std())
 
     if brightness > 145 and warmth > 18:
         return "happy"
