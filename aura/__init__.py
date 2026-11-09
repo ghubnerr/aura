@@ -1,13 +1,17 @@
-import os
-from dotenv import load_dotenv
+"""Aura: real-time emotion-aligned abstract art over WebRTC."""
 
+from __future__ import annotations
+
+from aura.config import CONFIG, load_config
+
+# Native PyO3 extension built by maturin (`aura.aura`).
 from aura.aura import SignalingServer, VideoStreamer
-load_dotenv()
-if not os.environ.get("STORAGE_PATH"):
-    os.makedirs("output", exist_ok=True)
-    os.environ["STORAGE_PATH"] = "./output"
 
-save_dir = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage")
-os.makedirs(save_dir, exist_ok=True)
+__all__ = [
+    "CONFIG",
+    "SignalingServer",
+    "VideoStreamer",
+    "load_config",
+]
 
-__all__ = ["SignalingServer", "VideoStreamer"]
+__version__ = "0.1.0"

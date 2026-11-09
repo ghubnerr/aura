@@ -1,174 +1,172 @@
-const signalingSocket = new WebSocket("ws://127.0.0.1:3030/signaling");
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
+/**
+ * Browser WebRTC client for Aura.
+ *
+ * Signaling host defaults to the page hostname so the same UI works against
+ * localhost or a cloud/GPU host. Override with ?signaling=host:port.
+ */
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const signalingParam = params.get("signaling");
+  const defaultHost = window.location.hostname || "127.0.0.1";
+  const signalingTarget = signalingParam || `${defaultHost}:3030`;
+  const signalingUrl = `ws://${signalingTarget}/signaling`;
 
+  const localVideo = document.getElementById("localVideo");
+  const remoteVideo = document.getElementById("remoteVideo");
+  const capturedImage = document.getElementById("capturedImage");
+  const statusEl = document.getElementById("status");
 
-const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-});
+  const signalingSocket = new WebSocket(signalingUrl);
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  });
 
-// WebSocket Event Handlers
-signalingSocket.onopen = () => {
-    console.log("WebSocket connected!");
+  function setStatus(text) {
+    if (statusEl) {
+      statusEl.textContent = text;
+    }
+    console.log(text);
+  }
+
+  function sendMessage(data) {
+    if (signalingSocket.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket is not open. Cannot send message:", data);
+      return;
+    }
+    signalingSocket.send(JSON.stringify(data));
+  }
+
+  function captureFrame() {
+    if (!localVideo.videoWidth || !localVideo.videoHeight) {
+      console.warn("Local video not ready for capture");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = localVideo.videoWidth;
+    canvas.height = localVideo.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      console.error("Failed to get canvas context");
+      return;
+    }
+
+    context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL("image/png");
+    capturedImage.src = imageData;
+    capturedImage.style.display = "block";
+    sendMessage({ type: "image", data: imageData });
+  }
+
+  async function startLocalMedia() {
+    const localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false,
+    });
+    localVideo.srcObject = localStream;
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+  }
+
+  signalingSocket.onopen = () => {
+    setStatus(`WebSocket connected to ${signalingUrl}`);
     document.getElementById("startCall").disabled = false;
     document.getElementById("captureImage").disabled = false;
-};
+  };
 
-signalingSocket.onerror = (error) => {
+  signalingSocket.onerror = (error) => {
     console.error("WebSocket error:", error);
-};
+    setStatus("WebSocket error — is the signaling server running?");
+  };
 
-signalingSocket.onclose = (event) => {
-    console.log("WebSocket closed:", event.code, event.reason);
-};
+  signalingSocket.onclose = (event) => {
+    setStatus(`WebSocket closed: ${event.code} ${event.reason || ""}`.trim());
+  };
 
-// Capture media stream and add to PeerConnection
-async function startCall() {
-    const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localVideo.srcObject = localStream;
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-}
-
-// Unified function for sending WebSocket messages
-function sendMessage(data) {
-    if (signalingSocket.readyState === WebSocket.OPEN) {
-        console.log("Sending message:", data);
-        signalingSocket.send(JSON.stringify(data));
-    } else {
-        console.error("WebSocket is not open. Cannot send message:", data);
+  document.getElementById("startCall").onclick = async () => {
+    if (signalingSocket.readyState !== WebSocket.OPEN) {
+      setStatus("WebSocket is not open, cannot start call");
+      return;
     }
-}
+    await startLocalMedia();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    sendMessage({ type: "offer", sdp: offer.sdp });
+    setStatus("Sent offer");
+  };
 
-// Start call when button is clicked
-document.getElementById("startCall").onclick = async () => {
-    if (signalingSocket.readyState === WebSocket.OPEN) {
-        await startCall();
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendMessage({ type: "offer", sdp: offer.sdp });
-    } else {
-        console.error("WebSocket is not open, cannot start call");
+  pc.onicecandidate = ({ candidate }) => {
+    if (!candidate) {
+      return;
     }
-};
+    sendMessage({
+      type: "candidate",
+      candidate: candidate.candidate,
+      sdpMid: candidate.sdpMid,
+      sdpMLineIndex: candidate.sdpMLineIndex,
+    });
+  };
 
-// Send ICE candidates to the signaling server
-pc.onicecandidate = ({ candidate }) => {
-    if (candidate) {
-        sendMessage({
-            type: "candidate",
-            candidate: candidate.candidate,
-            sdpMid: candidate.sdpMid,
-            sdpMLineIndex: candidate.sdpMLineIndex
-        });
-    }
-};
-
-// Handle incoming messages from the signaling server
-signalingSocket.onmessage = async (message) => {
+  signalingSocket.onmessage = async (message) => {
     const data = JSON.parse(message.data);
 
     if (data.type === "candidate") {
-        if (data.candidate && (data.sdpMid !== null || data.sdpMLineIndex !== null)) {
-            try {
-                const candidate = new RTCIceCandidate({
-                    candidate: data.candidate,
-                    sdpMid: data.sdpMid,
-                    sdpMLineIndex: data.sdpMLineIndex
-                });
-                await pc.addIceCandidate(candidate);
-                console.log("Added ICE candidate:", candidate);
-            } catch (error) {
-                console.error("Error adding received ICE candidate", error);
-            }
-        } else {
-            console.warn("Skipping ICE candidate due to missing sdpMid or sdpMLineIndex", data);
-        }
-    } else if (data.type === "offer") {
-        try {
-            await pc.setRemoteDescription(new RTCSessionDescription(data));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            sendMessage({ type: "answer", sdp: answer.sdp });
-            console.log("Sent answer to offer");
-        } catch (error) {
-            console.error("Error handling received offer", error);
-        }
-    } else if (data.type === "answer") {
-        try {
-            await pc.setRemoteDescription(new RTCSessionDescription(data));
-            console.log("Set remote description from answer");
-        } catch (error) {
-            console.error("Error setting remote description from answer", error);
-        }
-    } else if (data.type === "image") {
-        console.log("Received image data:", data.data);
-    } else if (data.type === "triggerimagecapture") {
-        console.log("Received trigger from server, capturing frame...");
-        captureFrame();
-    } else {
-        console.log("Unknown message type:", data);
+      if (data.candidate == null) {
+        return;
+      }
+      try {
+        await pc.addIceCandidate(
+          new RTCIceCandidate({
+            candidate: data.candidate,
+            sdpMid: data.sdpMid ?? data.sdp_mid ?? null,
+            sdpMLineIndex:
+              data.sdpMLineIndex ?? data.sdp_mline_index ?? null,
+          })
+        );
+      } catch (error) {
+        console.error("Error adding received ICE candidate", error);
+      }
+      return;
     }
-};
 
-// Handle track event for remote stream
-pc.ontrack = (event) => {
+    if (data.type === "offer") {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendMessage({ type: "answer", sdp: answer.sdp });
+        setStatus("Answered remote offer");
+      } catch (error) {
+        console.error("Error handling received offer", error);
+      }
+      return;
+    }
+
+    if (data.type === "answer") {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data));
+        setStatus("Remote answer applied");
+      } catch (error) {
+        console.error("Error setting remote description from answer", error);
+      }
+      return;
+    }
+
+    if (data.type === "triggerimagecapture") {
+      captureFrame();
+      return;
+    }
+
+    if (data.type === "image") {
+      console.log("Received image ack/data");
+    }
+  };
+
+  pc.ontrack = (event) => {
     if (!remoteVideo.srcObject) {
-        remoteVideo.srcObject = event.streams[0];
+      remoteVideo.srcObject = event.streams[0];
+      setStatus("Receiving remote art stream");
     }
-};
+  };
 
-const captureImageBtn = document.getElementById("captureImage");
-const capturedImage = document.getElementById("capturedImage");
-
-// Capture the video frame and display it as an image
-captureImageBtn.addEventListener("click", () => {
-    // Create a canvas element dynamically
-    const canvas = document.createElement("canvas");
-    canvas.width = localVideo.videoWidth;
-    canvas.height = localVideo.videoHeight;
-
-    // Draw the current frame from the video
-    const context = canvas.getContext("2d");
-    if (context) {
-        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
-
-        // Convert canvas to Base64 image
-        const imageData = canvas.toDataURL("image/png");
-
-        // Display the captured image in the <img> element
-        capturedImage.src = imageData;
-        capturedImage.style.display = "block";
-
-        console.log("Image captured:", imageData);
-
-        sendMessage({ type: "image", data: imageData });
-    } else {
-        console.error("Failed to get canvas context");
-    }
-});
-
-function captureFrame() {
-    const canvas = document.createElement("canvas");
-    canvas.width = localVideo.videoWidth;
-    canvas.height = localVideo.videoHeight;
-
-    // Draw the current frame from the video
-    const context = canvas.getContext("2d");
-    if (context) {
-        context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
-
-        // Convert canvas to Base64 image
-        const imageData = canvas.toDataURL("image/png");
-
-        // Display the captured image in the <img> element
-        capturedImage.src = imageData;
-        capturedImage.style.display = "block";
-
-        console.log("Image captured:", imageData);
-
-        // Send the captured image data to the server
-        sendMessage({ type: "image", data: imageData });
-    } else {
-        console.error("Failed to get canvas context for drawing.");
-    }
-}
+  document.getElementById("captureImage").addEventListener("click", captureFrame);
+})();

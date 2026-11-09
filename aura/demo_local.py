@@ -1,39 +1,39 @@
+"""Send one webcam frame to the legacy demo websocket server."""
+
+from __future__ import annotations
+
+import argparse
 import asyncio
-import websockets
-import base64
 
 import cv2
+import websockets
 
 
-async def main():
-    # You might need to change this to 0 or a different number to pick the right camera
-    cap = cv2.VideoCapture(1) 
-    ret, frame = cap.read()
-    cap.release()
-    if not ret:
-        print("Failed to capture frame from camera.")
-        return
+async def run(camera_index: int, uri: str) -> None:
+    capture = cv2.VideoCapture(camera_index)
+    ok, frame = capture.read()
+    capture.release()
+    if not ok:
+        raise SystemExit("Failed to capture frame from camera.")
 
-    _, buffer = cv2.imencode('.jpg', frame)
-    jpg_bytes = buffer.tobytes()
-    encoded_image = base64.b64encode(jpg_bytes).decode('utf-8')
+    _ok, buffer = cv2.imencode(".jpg", frame)
+    async with websockets.connect(uri, max_size=None) as websocket:
+        await websocket.send(buffer.tobytes())
+        print("Frame sent; waiting for streamed JPEG frames (Ctrl+C to stop)...")
+        async for message in websocket:
+            if isinstance(message, (bytes, bytearray)):
+                print(f"Received frame bytes: {len(message)}")
+            else:
+                print(message)
 
-    uri = "ws://localhost:6000"
-    async with websockets.connect(uri) as ws:
-        await ws.send(encoded_image)
-        
-        video_data = await ws.recv()
-        with open("received_video.mp4", "wb") as f:
-            f.write(video_data)
 
-    cap = cv2.VideoCapture('received_video.mp4')
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        cv2.imshow("Generated Video", frame)
-        if cv2.waitKey(30) & 0xFF == ord('q'):
-            break
-    cv2.destroyAllWindows()
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--camera", type=int, default=0)
+    parser.add_argument("--uri", default="ws://127.0.0.1:6000")
+    args = parser.parse_args()
+    asyncio.run(run(args.camera, args.uri))
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    main()

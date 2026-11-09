@@ -94,3 +94,6 @@ logs/
 aura/cnn/checkpoints/
 
 *.pth
+captured_image.png
+ivf_files/
+logs/

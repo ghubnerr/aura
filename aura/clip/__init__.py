@@ -1,4 +1,5 @@
-from .loss import EmotionAwareContrastiveLoss
-from .visualization import EmbeddingVisualizer
-from .model import CLIPImageEncoder, EmotionEncoderWithProjection
-from .dataloader import ContrastiveEmotionDataset
+"""Contrastive emotion ↔ art alignment package."""
+
+from aura.clip.model import CLIPImageEncoder, EmotionEncoderWithProjection
+
+__all__ = ["CLIPImageEncoder", "EmotionEncoderWithProjection"]
