@@ -267,7 +267,9 @@ def create_art_backend(kind: Optional[str] = None):
     """
     from aura.inference.continuous_art import MorphingStubBackend
 
-    choice = (kind or os.environ.get("AURA_ART_BACKEND", "auto")).strip().lower()
+    # Default morphing: reliable continuous video without GPU OOM / download stalls.
+    # Opt into diffusion with AURA_ART_BACKEND=diffusers_turbo (see start_gpu_host.bat).
+    choice = (kind or os.environ.get("AURA_ART_BACKEND", "morphing")).strip().lower()
 
     if choice in {"morphing", "stub"}:
         return MorphingStubBackend()

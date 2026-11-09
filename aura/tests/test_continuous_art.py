@@ -39,3 +39,11 @@ def test_set_conditioning_updates_engine_without_reset(tmp_path):
     assert engine._emotion_hint == "happy"
     # Temporal state preserved on conditioning updates.
     assert np.array_equal(engine._frame, before)
+
+
+def test_seed_live_ivf_writes_file(tmp_path):
+    from aura.inference.continuous_art import seed_live_ivf
+
+    path = seed_live_ivf(str(tmp_path))
+    assert path.is_file()
+    assert path.stat().st_size > 1000

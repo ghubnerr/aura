@@ -80,13 +80,8 @@ def render(emotion: str, out_path: Path, seconds: float, use_gradients: bool) ->
     recipe = EMOTIONS[emotion]
     src = recipe["src"] if use_gradients else FALLBACK_SRC
     # Always burn the emotion name so swaps are obvious.
-    vf = (
-        f"format=yuv420p,{recipe['vf']},"
-        f"drawtext=text='{emotion.upper()}':fontsize=42:fontcolor=white:"
-        f"borderw=3:bordercolor=black:x=24:y=24,"
-        f"drawtext=text='aura stub':fontsize=18:fontcolor=white@0.7:"
-        f"x=24:y=72"
-    )
+    # No burned-in labels — those looked broken when the UI cropped the frame.
+    vf = f"format=yuv420p,{recipe['vf']}"
     cmd = [
         "ffmpeg",
         "-y",

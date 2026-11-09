@@ -23,8 +23,8 @@ def test_emotion_prompts_cover_labels():
         assert "no people" in EMOTION_PROMPTS[key]
 
 
-def test_create_backend_morphing(monkeypatch):
-    monkeypatch.setenv("AURA_ART_BACKEND", "morphing")
+def test_create_backend_defaults_to_morphing(monkeypatch):
+    monkeypatch.delenv("AURA_ART_BACKEND", raising=False)
     backend = create_art_backend()
     assert type(backend).__name__ == "MorphingStubBackend"
 

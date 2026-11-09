@@ -22,8 +22,8 @@
   const capturedImage = document.getElementById("capturedImage");
   const statusEl = document.getElementById("status");
   const emotionEl = document.getElementById("emotion");
+  const artMetaEl = document.getElementById("artMeta");
 
-  // Autoplay policies: muted remote video can start without a gesture.
   remoteVideo.muted = true;
   remoteVideo.setAttribute("playsinline", "true");
   remoteVideo.setAttribute("autoplay", "true");
@@ -43,6 +43,11 @@
     emotionEl.innerHTML = `Emotion: <strong>${text}</strong>`;
   }
 
+  function setArtMeta(text) {
+    if (!artMetaEl) return;
+    artMetaEl.innerHTML = `Art: <strong>${text}</strong>`;
+  }
+
   function sendMessage(data) {
     if (signalingSocket.readyState !== WebSocket.OPEN) {
       console.error("WebSocket is not open. Cannot send message:", data);
@@ -60,9 +65,19 @@
     }
   }
 
+  function syncRemoteAspect() {
+    if (!remoteVideo.videoWidth || !remoteVideo.videoHeight) return;
+    remoteVideo.style.aspectRatio = `${remoteVideo.videoWidth} / ${remoteVideo.videoHeight}`;
+    setArtMeta(`${remoteVideo.videoWidth}x${remoteVideo.videoHeight}`);
+  }
+
+  remoteVideo.addEventListener("loadedmetadata", syncRemoteAspect);
+  remoteVideo.addEventListener("resize", syncRemoteAspect);
+
   function captureFrame() {
     if (!localVideo.videoWidth || !localVideo.videoHeight) {
       console.warn("Local video not ready for capture");
+      setEmotion("camera not ready");
       return;
     }
     const canvas = document.createElement("canvas");
@@ -142,7 +157,13 @@
   };
 
   signalingSocket.onmessage = async (message) => {
-    const data = JSON.parse(message.data);
+    let data;
+    try {
+      data = JSON.parse(message.data);
+    } catch (err) {
+      console.warn("Non-JSON signaling message", err);
+      return;
+    }
 
     if (data.type === "candidate") {
       if (data.candidate == null || data.candidate === "") return;
@@ -185,14 +206,22 @@
 
     if (data.type === "triggerimagecapture") {
       captureFrame();
+      return;
     }
 
     if (data.type === "emotion") {
       if (data.error) {
         setEmotion(`${data.emotion} (${data.error})`);
       } else if (data.emotion) {
-        setEmotion(data.emotion);
+        const suffix = data.demo ? " [demo]" : "";
+        setEmotion(`${data.emotion}${suffix}`);
       }
+      return;
+    }
+
+    if (data.type === "art_status") {
+      const bits = [data.backend, data.fps ? `${data.fps}fps` : null].filter(Boolean);
+      setArtMeta(bits.join(" · "));
     }
   };
 
@@ -201,7 +230,11 @@
     remoteVideo.srcObject = stream;
     setStatus("Receiving remote art stream");
     playRemote();
-    event.track.onunmute = () => playRemote();
+    syncRemoteAspect();
+    event.track.onunmute = () => {
+      playRemote();
+      syncRemoteAspect();
+    };
   };
 
   document.getElementById("captureImage").addEventListener("click", captureFrame);

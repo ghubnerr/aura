@@ -37,12 +37,12 @@ def main(argv: list[str] | None = None) -> None:
 
     signal.signal(signal.SIGINT, _shutdown)
 
-    # Ensure live.ivf exists before the Rust watcher starts, so the first
-    # peer connection already has frames to send.
+    # Seed a text-free vivid morphing chunk — never the labeled NEUTRAL stubs.
     try:
-        from aura.inference.art_generator import EmotionArtGenerator
+        from aura.inference.continuous_art import seed_live_ivf
 
-        EmotionArtGenerator(ivf_dir=args.ivf_dir).publish("neutral", force=True)
+        path = seed_live_ivf(args.ivf_dir)
+        print(f"Seeded continuous live IVF (no text overlay): {path}")
     except Exception as exc:  # noqa: BLE001
         print(f"Could not seed IVF before stream start: {exc}")
 

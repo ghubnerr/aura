@@ -9,9 +9,8 @@ conditioning signal. Backends must produce the *next* frames from that pair so
 the WebRTC track is a continuous video, with mood drifting as the embedding
 updates — never a hard cut to an unrelated clip.
 
-- ``MorphingStubBackend``: proves continuity on CPU (smooth color/motion drift).
-- ``DiffusersTurboBackend``: SD-Turbo img2img on GPU (fits 16GB; recommended).
-- ``StreamDiffusionBackend``: optional StreamDiffusion v1 wrapper.
+- ``MorphingStubBackend``: vivid CPU stand-in (default; always works)
+- ``DiffusersTurboBackend``: SD-Turbo img2img when ``AURA_ART_BACKEND=diffusers_turbo``
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ _EMOTION_RGB = {
     "surprise": np.array([1.00, 0.20, 0.65], dtype=np.float32),
     "disgust": np.array([0.20, 0.55, 0.25], dtype=np.float32),
     "contempt": np.array([0.40, 0.45, 0.40], dtype=np.float32),
-    "neutral": np.array([0.35, 0.38, 0.42], dtype=np.float32),
+    "neutral": np.array([0.25, 0.55, 0.75], dtype=np.float32),
 }
 
 
@@ -54,12 +53,7 @@ class ContinuousArtBackend(Protocol):
 
 
 class MorphingStubBackend:
-    """CPU stand-in that keeps temporal continuity across emotion changes.
-
-    Uses the embedding only lightly (norm → motion energy) and an optional
-    emotion hint for the target palette. A real diffusion backend will map the
-    full embedding into cross-attention / AdaIN conditioning instead.
-    """
+    """Vivid CPU stand-in that keeps temporal continuity across emotion changes."""
 
     def __init__(self, width: int = 640, height: int = 480) -> None:
         self.width = width
@@ -86,30 +80,31 @@ class MorphingStubBackend:
             raise ValueError(f"expected HxWx3, got {current_frame.shape}")
 
         emb = np.asarray(embedding, dtype=np.float32).reshape(-1)
-        energy = float(np.linalg.norm(emb) / max(np.sqrt(emb.size), 1.0))
-        energy = float(np.clip(energy / 8.0, 0.15, 1.5))
+        energy = float(np.linalg.norm(emb) / max(np.sqrt(emb.size), 1.0)) if emb.size else 1.0
+        energy = float(np.clip(energy / 4.0, 0.6, 2.0))
 
         target = _EMOTION_RGB.get(self._emotion_hint, _EMOTION_RGB["neutral"])
+        # Secondary accent for richer abstract motion.
+        accent = np.clip(1.0 - target, 0.0, 1.0)
         frame = current_frame.astype(np.float32) / 255.0
         out: list[np.ndarray] = []
 
         for _ in range(max(1, n_frames)):
-            self._phase += 0.045 * energy
-            # Soft blend toward the emotion palette — no hard cut.
-            blend = 0.04 + 0.03 * energy
+            self._phase += 0.08 * energy
+            blend = 0.12 + 0.08 * energy
             base = frame * (1.0 - blend) + target.reshape(1, 1, 3) * blend
 
-            wave = 0.5 + 0.5 * np.sin(
-                3.0 * self._xx + 2.0 * self._yy + self._phase
+            wave = 0.5 + 0.5 * np.sin(3.2 * self._xx + 2.1 * self._yy + self._phase)
+            ripple = 0.5 + 0.5 * np.cos(5.1 * self._yy - 1.7 * self._xx + 0.9 * self._phase)
+            bands = 0.5 + 0.5 * np.sin(8.0 * self._xx + 0.35 * self._phase)
+            field = (0.45 * wave + 0.35 * ripple + 0.20 * bands)[..., None]
+            mixed = base * (0.45 + 0.70 * field) + accent.reshape(1, 1, 3) * (
+                0.15 * (1.0 - field)
             )
-            ripple = 0.5 + 0.5 * np.cos(
-                5.0 * self._yy - 1.5 * self._xx + 0.7 * self._phase
-            )
-            field = (0.55 * wave + 0.45 * ripple)[..., None]
-            mixed = np.clip(base * (0.65 + 0.55 * field), 0.0, 1.0)
+            mixed = np.clip(mixed, 0.0, 1.0)
 
-            # Keep a little of the previous pixels for temporal coherence.
-            frame = 0.82 * frame + 0.18 * mixed
+            # Keep continuity, but let mood read clearly within ~1s.
+            frame = 0.70 * frame + 0.30 * mixed
             out.append((np.clip(frame, 0.0, 1.0) * 255.0).astype(np.uint8))
 
         return out
@@ -138,11 +133,10 @@ class ContinuousArtEngine:
         self.ivf_dir.mkdir(parents=True, exist_ok=True)
 
         backend_name = type(self.backend).__name__
-        # Diffusion steps are heavier; default to a lower publish rate.
         if fps is None:
-            fps = 6.0 if "Diffusers" in backend_name or "Stream" in backend_name else 24.0
+            fps = 6.0 if "Diffusers" in backend_name or "Stream" in backend_name else 20.0
         if chunk_frames is None:
-            chunk_frames = 6 if fps <= 12 else 24
+            chunk_frames = 6 if fps <= 12 else 20
         self.fps = float(os.environ.get("AURA_ART_FPS", fps))
         self.chunk_frames = int(os.environ.get("AURA_ART_CHUNK_FRAMES", chunk_frames))
         self.live_name = live_name
@@ -154,6 +148,7 @@ class ContinuousArtEngine:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._ffmpeg = shutil.which("ffmpeg")
+        self.last_error: Optional[str] = None
 
     @classmethod
     def get_shared(cls) -> "ContinuousArtEngine":
@@ -163,11 +158,12 @@ class ContinuousArtEngine:
             return cls._shared
 
     def _seed_frame(self) -> np.ndarray:
-        h = int(getattr(self.backend, "height", 512))
-        w = int(getattr(self.backend, "width", 512))
-        target = _EMOTION_RGB["neutral"].reshape(1, 1, 3)
+        h = int(getattr(self.backend, "height", 480))
+        w = int(getattr(self.backend, "width", 640))
+        # Start colorful (not gray) so a failed mood update is still obvious video.
+        target = _EMOTION_RGB["surprise"].reshape(1, 1, 3)
         noise = np.random.rand(h, w, 1).astype(np.float32)
-        rgb = np.clip(target * (0.55 + 0.45 * noise), 0.0, 1.0)
+        rgb = np.clip(target * (0.45 + 0.55 * noise), 0.0, 1.0)
         return (rgb * 255.0).astype(np.uint8)
 
     def set_conditioning(
@@ -181,7 +177,6 @@ class ContinuousArtEngine:
             if emb.size == self._embedding.size:
                 self._embedding = emb.copy()
             else:
-                # Allow mismatched dims during bring-up; pad/truncate.
                 out = np.zeros_like(self._embedding)
                 n = min(out.size, emb.size)
                 out[:n] = emb[:n]
@@ -191,6 +186,19 @@ class ContinuousArtEngine:
                 if hasattr(self.backend, "set_emotion_hint"):
                     self.backend.set_emotion_hint(emotion)
 
+    def publish_now(self, n_frames: Optional[int] = None) -> Path:
+        """Synchronously render and publish one IVF chunk (no burned-in text)."""
+        count = n_frames or self.chunk_frames
+        frames: list[np.ndarray] = []
+        with self._cond_lock:
+            emb = self._embedding.copy()
+        for _ in range(count):
+            stepped = self.backend.step(self._frame, emb, n_frames=1)
+            self._frame = stepped[-1]
+            frames.append(self._frame)
+        self._publish_chunk(frames)
+        return self.ivf_dir / self.live_name
+
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
             return
@@ -198,13 +206,28 @@ class ContinuousArtEngine:
             print("ContinuousArtEngine: ffmpeg not found; cannot encode IVF chunks")
             return
 
-        # Warm the backend (downloads weights on first GPU run).
-        try:
-            warmed = self.backend.step(self._frame, self._embedding, n_frames=1)
-            self._frame = warmed[-1]
-            print(f"ContinuousArtEngine warmup ok ({type(self.backend).__name__})")
-        except Exception as exc:  # noqa: BLE001
-            print(f"ContinuousArtEngine warmup failed: {exc}")
+        # Publish a first chunk immediately on a helper thread so signaling
+        # is not blocked by GPU model download / warmup.
+        def _boot() -> None:
+            try:
+                path = self.publish_now()
+                print(
+                    f"ContinuousArtEngine boot chunk ok "
+                    f"({type(self.backend).__name__}) -> {path}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                self.last_error = str(exc)
+                print(f"ContinuousArtEngine boot failed: {exc}")
+                # Last-resort: vivid morphing so we never leave labeled stubs.
+                try:
+                    self.backend = MorphingStubBackend()
+                    self._frame = self._seed_frame()
+                    path = self.publish_now()
+                    print(f"ContinuousArtEngine fell back to morphing -> {path}")
+                except Exception as fallback_exc:  # noqa: BLE001
+                    print(f"Morphing fallback also failed: {fallback_exc}")
+
+        threading.Thread(target=_boot, name="aura-art-boot", daemon=True).start()
 
         self._stop.clear()
         self._thread = threading.Thread(
@@ -228,18 +251,22 @@ class ContinuousArtEngine:
         period = 1.0 / max(self.fps, 1.0)
         while not self._stop.is_set():
             t0 = time.perf_counter()
-            with self._cond_lock:
-                emb = self._embedding.copy()
-            frames = self.backend.step(self._frame, emb, n_frames=1)
-            self._frame = frames[-1]
-            buffer.append(self._frame)
+            try:
+                with self._cond_lock:
+                    emb = self._embedding.copy()
+                frames = self.backend.step(self._frame, emb, n_frames=1)
+                self._frame = frames[-1]
+                buffer.append(self._frame)
 
-            if len(buffer) >= self.chunk_frames:
-                try:
+                if len(buffer) >= self.chunk_frames:
                     self._publish_chunk(buffer)
-                except Exception as exc:  # noqa: BLE001 - keep loop alive
-                    print(f"ContinuousArtEngine publish failed: {exc}")
+                    buffer = []
+                self.last_error = None
+            except Exception as exc:  # noqa: BLE001 - keep loop alive
+                self.last_error = str(exc)
+                print(f"ContinuousArtEngine step/publish failed: {exc}")
                 buffer = []
+                time.sleep(0.5)
 
             elapsed = time.perf_counter() - t0
             time.sleep(max(0.0, period - elapsed))
@@ -248,12 +275,14 @@ class ContinuousArtEngine:
         """Encode a short continuous chunk and atomically replace live.ivf."""
         if not frames:
             return
+        if not self._ffmpeg:
+            raise RuntimeError("ffmpeg not found on PATH")
+
         h, w, _ = frames[0].shape
         dest = self.ivf_dir / self.live_name
         tmp = self.ivf_dir / f".{self.live_name}.encode.ivf"
         raw = self.ivf_dir / f".{self.live_name}.raw"
 
-        # Concatenate RGB24 frames for ffmpeg rawvideo.
         blob = b"".join(frame.tobytes() for frame in frames)
         raw.write_bytes(blob)
 
@@ -305,3 +334,14 @@ class ContinuousArtEngine:
             raw.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+def seed_live_ivf(ivf_dir: Optional[str] = None) -> Path:
+    """Write a text-free vivid morphing chunk so the streamer never boots on stubs."""
+    engine = ContinuousArtEngine(
+        backend=MorphingStubBackend(),
+        ivf_dir=ivf_dir,
+        fps=20,
+        chunk_frames=20,
+    )
+    return engine.publish_now()

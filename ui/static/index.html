@@ -39,11 +39,11 @@
             text-transform: uppercase;
             font-size: 1.4rem;
         }
-        #status, #emotion {
+        #status, #emotion, #artMeta {
             color: var(--muted);
             font-size: 0.95rem;
         }
-        #emotion strong { color: var(--accent); font-weight: 600; }
+        #emotion strong, #artMeta strong { color: var(--accent); font-weight: 600; }
         .controls {
             display: flex;
             flex-wrap: wrap;
@@ -92,10 +92,12 @@
         }
         #remoteVideo {
             width: 100%;
-            aspect-ratio: 16 / 10;
+            max-height: 70vh;
+            aspect-ratio: 4 / 3;
             background: #05080c;
             border-radius: 10px;
-            object-fit: cover;
+            /* contain = full frame visible (no cropped NEUTRAL text / edges) */
+            object-fit: contain;
             display: block;
         }
         .side-panel video,
@@ -104,7 +106,7 @@
             aspect-ratio: 4 / 3;
             background: var(--panel);
             border-radius: 8px;
-            object-fit: cover;
+            object-fit: contain;
             display: block;
             margin-bottom: 8px;
         }
@@ -126,6 +128,7 @@
         <h1>Aura</h1>
         <div id="status">Connecting to signaling…</div>
         <div id="emotion">Emotion: <strong>—</strong></div>
+        <div id="artMeta">Art: <strong>—</strong></div>
     </header>
 
     <div class="controls">
@@ -146,9 +149,9 @@
     </div>
 
     <p class="hint">
-        Left = continuous art stream (current frame + emotion embedding → next
-        frames). Right = your camera. Mood updates condition the stream without
-        resetting it. GPU diffusion backend comes next.
+        Left = continuous art (full frame, letterboxed if needed). Right = camera.
+        Emotion should update within a second of Capture Face. If you still see
+        burned-in “NEUTRAL” text, hard-refresh after the host restarts.
     </p>
 
     <script src="app.js"></script>

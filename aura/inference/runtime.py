@@ -4,9 +4,8 @@ Product path: face crop -> emotion embedding -> continuous art engine
 
     next_frames = step(current_frame, embedding)
 
-The stub IVF clip swapper remains available for demos without ffmpeg encode,
-but the shared ContinuousArtEngine is what keeps the stream temporally
-continuous when the signaling server is running.
+When no trained emotion checkpoint is present, a small face-color heuristic
+labels mood so the live demo still updates (random ResNet weights do not).
 """
 
 from __future__ import annotations
@@ -20,6 +19,7 @@ import torch
 
 from aura.cnn import EmotionModel
 from aura.config import CONFIG
+from aura.inference.emotion_heuristic import heuristic_emotion
 
 
 class EmotionArtRuntime:
@@ -32,11 +32,15 @@ class EmotionArtRuntime:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = EmotionModel(pretrained=False)
         path = checkpoint or CONFIG.emotion_checkpoint
-        if os.path.isfile(path):
+        self.use_demo_heuristic = not os.path.isfile(path)
+        if not self.use_demo_heuristic:
             self.model.load(path)
         else:
-            # Random weights keep the live path exercisable before training.
             self.model.to(self.device)
+            print(
+                "Emotion runtime: no checkpoint at "
+                f"{path} — using demo face-color heuristic for labels"
+            )
         self.model.eval()
         self.last_embedding: Optional[np.ndarray] = None
         self.last_logits: Optional[np.ndarray] = None
@@ -70,24 +74,28 @@ class EmotionArtRuntime:
             face_hwc = face_chw
 
         face_u8 = np.clip(face_hwc * 255.0, 0, 255).astype(np.uint8)
-        # Faces from OpenCV are BGR; EmotionModel.embed converts BGR->RGB.
         embedding = self.model.embed(face_u8, use_representation=True)
-        logits = self.model.embed(face_u8, use_representation=False)
-        if isinstance(logits, torch.Tensor):
-            logits_np = logits.detach().cpu().numpy().reshape(-1)
-        else:
-            logits_np = np.asarray(logits).reshape(-1)
-
-        pred = int(np.argmax(logits_np))
         self.last_embedding = np.asarray(embedding)
-        self.last_logits = logits_np
-        self.last_emotion = self.label_names[pred]
+
+        if self.use_demo_heuristic:
+            self.last_emotion = heuristic_emotion(face_u8)
+            self.last_logits = None
+        else:
+            logits = self.model.embed(face_u8, use_representation=False)
+            if isinstance(logits, torch.Tensor):
+                logits_np = logits.detach().cpu().numpy().reshape(-1)
+            else:
+                logits_np = np.asarray(logits).reshape(-1)
+            pred = int(np.argmax(logits_np))
+            self.last_logits = logits_np
+            self.last_emotion = self.label_names[pred]
+
         print(
             f"Emotion runtime: {self.last_emotion} "
-            f"(embed dim={self.last_embedding.shape[-1]})"
+            f"(embed dim={self.last_embedding.shape[-1]}"
+            f"{', demo_heuristic' if self.use_demo_heuristic else ''})"
         )
 
-        # Preferred path: condition the continuous generator in-place.
         try:
             from aura.inference.continuous_art import ContinuousArtEngine
 
@@ -97,13 +105,6 @@ class EmotionArtRuntime:
             )
         except Exception as exc:  # noqa: BLE001
             print(f"Continuous conditioning skipped: {exc}")
-            # Fallback: hard stub swap (discontinuous — demo only).
-            try:
-                from aura.inference.art_generator import EmotionArtGenerator
-
-                EmotionArtGenerator().publish(self.last_emotion)
-            except Exception as publish_exc:  # noqa: BLE001
-                print(f"Art publish skipped: {publish_exc}")
 
         return self.last_embedding
 
@@ -115,5 +116,6 @@ class EmotionArtRuntime:
             {
                 "type": "emotion",
                 "emotion": self.last_emotion or "unknown",
+                "demo": self.use_demo_heuristic,
             }
         )
