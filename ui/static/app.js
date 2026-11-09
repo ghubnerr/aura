@@ -1,8 +1,8 @@
 /**
  * Browser WebRTC client for Aura.
  *
- * Signaling host defaults to the page hostname. Override with ?signaling=host:port
- * Use ?tls=0 to force ws:// even on an https page (not recommended).
+ * Signaling host defaults to the page hostname. Override with ?signaling=host:port.
+ * On HTTPS pages the client uses wss:// automatically (point at the WSS proxy).
  */
 (function () {
   const params = new URLSearchParams(window.location.search);
@@ -72,17 +72,19 @@
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
   }
 
+  setStatus(`Connecting to ${signalingUrl}…`);
+
   signalingSocket.onopen = () => {
-    setStatus(`WebSocket connected to ${signalingUrl}`);
+    setStatus(`Connected to ${signalingUrl}`);
     document.getElementById("startCall").disabled = false;
     document.getElementById("captureImage").disabled = false;
   };
 
-  signalingSocket.onerror = (error) => {
-    console.error("WebSocket error:", error);
+  signalingSocket.onerror = () => {
     setStatus(
-      `WebSocket error for ${signalingUrl} — is signaling running` +
-        (useTls ? " with --tls?" : "?")
+      useTls
+        ? `WSS error — is the proxy up on ${signalingTarget}?`
+        : `WebSocket error — is signaling up on ${signalingTarget}?`
     );
   };
 
@@ -95,11 +97,16 @@
       setStatus("WebSocket is not open, cannot start call");
       return;
     }
-    await startLocalMedia();
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    sendMessage({ type: "offer", sdp: offer.sdp });
-    setStatus("Sent offer");
+    try {
+      await startLocalMedia();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendMessage({ type: "offer", sdp: offer.sdp });
+      setStatus("Sent offer");
+    } catch (error) {
+      console.error(error);
+      setStatus(`Camera/WebRTC error: ${error.message || error}`);
+    }
   };
 
   pc.onicecandidate = ({ candidate }) => {
@@ -126,8 +133,7 @@
           new RTCIceCandidate({
             candidate: data.candidate,
             sdpMid: data.sdpMid ?? data.sdp_mid ?? null,
-            sdpMLineIndex:
-              data.sdpMLineIndex ?? data.sdp_mline_index ?? null,
+            sdpMLineIndex: data.sdpMLineIndex ?? data.sdp_mline_index ?? null,
           })
         );
       } catch (error) {
@@ -161,11 +167,6 @@
 
     if (data.type === "triggerimagecapture") {
       captureFrame();
-      return;
-    }
-
-    if (data.type === "image") {
-      console.log("Received image ack/data");
     }
   };
 
@@ -177,4 +178,5 @@
   };
 
   document.getElementById("captureImage").addEventListener("click", captureFrame);
+  setStatus(`Connecting to ${signalingUrl}…`);
 })();
