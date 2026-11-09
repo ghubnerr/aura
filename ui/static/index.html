@@ -146,9 +146,9 @@
     </div>
 
     <p class="hint">
-        Left = emotion art stub (labeled HAPPY/SAD/… for now). Right = your camera.
-        Capture Face classifies mood and swaps the stub. Neural realtime video
-        (StreamDiffusionV2 / Krea) comes next on the GPU host.
+        Left = continuous art stream (current frame + emotion embedding → next
+        frames). Right = your camera. Mood updates condition the stream without
+        resetting it. GPU diffusion backend comes next.
     </p>
 
     <script src="app.js"></script>

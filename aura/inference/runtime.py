@@ -1,8 +1,12 @@
 """Bridge from processed faces to emotion embeddings / art conditioning.
 
-Until StyleGAN-V or StreamDiffusionV2 weights are wired in, this runtime only
-extracts and caches the emotion embedding so the WebRTC path stays end-to-end
-testable.
+Product path: face crop -> emotion embedding -> continuous art engine
+
+    next_frames = step(current_frame, embedding)
+
+The stub IVF clip swapper remains available for demos without ffmpeg encode,
+but the shared ContinuousArtEngine is what keeps the stream temporally
+continuous when the signaling server is running.
 """
 
 from __future__ import annotations
@@ -57,7 +61,6 @@ class EmotionArtRuntime:
 
     def update_from_face(self, face_chw: np.ndarray) -> np.ndarray:
         """Update cached emotion state from a CHW float face crop in [0, 1]."""
-        # ProcessingPipeline returns CHW float; embed expects HWC.
         if face_chw.ndim != 3:
             raise ValueError(f"Expected CHW face tensor, got shape {face_chw.shape}")
 
@@ -67,7 +70,7 @@ class EmotionArtRuntime:
             face_hwc = face_chw
 
         face_u8 = np.clip(face_hwc * 255.0, 0, 255).astype(np.uint8)
-        # Faces from OpenCV are BGR; EmotionModel.embed converts BGR→RGB.
+        # Faces from OpenCV are BGR; EmotionModel.embed converts BGR->RGB.
         embedding = self.model.embed(face_u8, use_representation=True)
         logits = self.model.embed(face_u8, use_representation=False)
         if isinstance(logits, torch.Tensor):
@@ -84,12 +87,23 @@ class EmotionArtRuntime:
             f"(embed dim={self.last_embedding.shape[-1]})"
         )
 
+        # Preferred path: condition the continuous generator in-place.
         try:
-            from aura.inference.art_generator import EmotionArtGenerator
+            from aura.inference.continuous_art import ContinuousArtEngine
 
-            EmotionArtGenerator().publish(self.last_emotion)
-        except Exception as exc:  # noqa: BLE001 - keep classify path alive
-            print(f"Art publish skipped: {exc}")
+            ContinuousArtEngine.get_shared().set_conditioning(
+                self.last_embedding,
+                emotion=self.last_emotion,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"Continuous conditioning skipped: {exc}")
+            # Fallback: hard stub swap (discontinuous — demo only).
+            try:
+                from aura.inference.art_generator import EmotionArtGenerator
+
+                EmotionArtGenerator().publish(self.last_emotion)
+            except Exception as publish_exc:  # noqa: BLE001
+                print(f"Art publish skipped: {publish_exc}")
 
         return self.last_embedding
 

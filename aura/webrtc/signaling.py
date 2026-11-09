@@ -117,12 +117,21 @@ def main(argv: list[str] | None = None) -> None:
     )
     print("Press Ctrl+C to stop the server")
 
+    # Continuous path: (current_frame + emotion embedding) -> next frames.
+    # Stub clip swapping is only a fallback if the engine cannot start.
     try:
-        from aura.inference.art_generator import EmotionArtGenerator
+        from aura.inference.continuous_art import ContinuousArtEngine
 
-        EmotionArtGenerator().publish("neutral", force=True)
+        engine = ContinuousArtEngine.get_shared()
+        engine.start()
     except Exception as exc:  # noqa: BLE001
-        print(f"Could not seed initial IVF art: {exc}")
+        print(f"Continuous art engine failed to start: {exc}")
+        try:
+            from aura.inference.art_generator import EmotionArtGenerator
+
+            EmotionArtGenerator().publish("neutral", force=True)
+        except Exception as seed_exc:  # noqa: BLE001
+            print(f"Could not seed initial IVF art: {seed_exc}")
 
     last_hash: str | None = None
     last_trigger = 0.0

@@ -1,7 +1,8 @@
-"""Publish emotion-conditioned abstract art into the IVF watch directory.
+"""Fallback emotion stub publisher (discontinuous clip swap).
 
-MVP path: swap prebuilt VP8 stubs (palette / motion keyed by emotion). Later
-this module can call StreamDiffusionV2 / Krea Realtime and write live.ivf.
+Prefer ``ContinuousArtEngine`` / ``backend.step(current_frame, embedding)`` for
+the product path. This module remains for demos when the continuous encoder is
+unavailable — it hard-swaps prebuilt VP8 stubs and is *not* temporally continuous.
 """
 
 from __future__ import annotations

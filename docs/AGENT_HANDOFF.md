@@ -4,17 +4,15 @@
 **Branch / PR:** `cursor/cleanup-modernize-1aa4` → https://github.com/ghubnerr/aura/pull/43  
 **Windows worker:** `Gabes-PC` (`c:\Users\gabri\Projects\aura`) @ `192.168.1.200`
 
-## Critical fix (pull this)
+## Continuous generation contract
 
-Streamer previously **waited for a file Modify** before sending any frames, and **stopped at IVF EOF**. That left the browser with an empty remote track — users only saw their webcam / face capture.
+```
+next_frames = step(current_frame, emotion_embedding)
+```
 
-Now the streamer:
-1. Seeds from existing `ivf_files/live.ivf` immediately
-2. Loops frames from memory forever
-3. Reloads when emotion publish replaces `live.ivf`
-4. Trickles ICE candidates back to the browser
-
-**Must rebuild Rust:** `maturin develop`
+Signaling starts `ContinuousArtEngine` (CPU morphing stub for now). Face
+captures update the conditioning embedding; the frame state is **not** reset.
+See `docs/CONTINUOUS_ART.md`. Clip IVF swapping is fallback-only.
 
 ## Live host commands
 
@@ -28,15 +26,11 @@ python -m aura.webrtc.wss_proxy --port 3031
 python scripts/serve_ui_https.py
 ```
 
-Open: `https://192.168.1.200:8443/?signaling=192.168.1.200:3031`
-
-Hard-refresh the browser (Ctrl+Shift+R). After **Start Call**, the large left panel is the art stream; the small right panel is your camera.
+Open: `https://192.168.1.200:8443/?signaling=192.168.1.200:3031`  
+Hard-refresh after pulls.
 
 ## Success criteria
 
-1. Start Call → continuous labeled emotion stub on the left (not your face)
-2. Capture Face → status shows emotion within ~1s; art label/colors change
-3. Next: replace stub IVF publisher with StreamDiffusionV2/Krea on the 5060 Ti
-
-Note: current art is **placeholder gradients** with the emotion name burned in —
-not the trained generative model yet.
+1. Start Call → continuous art on the left (mood drifts, no hard-cut playlist)
+2. Capture Face → emotion status updates; stream keeps temporal continuity
+3. Swap `MorphingStubBackend` for StreamDiffusionV2/Krea with the same `step()` API
