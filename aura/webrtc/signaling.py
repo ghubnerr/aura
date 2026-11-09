@@ -1,4 +1,4 @@
-"""Run the Aura signaling server and optionally process captured faces."""
+"""Run the Aura signaling server and drive emotion → art updates."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from aura.config import CONFIG
 
 
 def _process_capture(server: SignalingServer, output_dir: str, verbose: int) -> None:
-    """Ask clients for a frame, crop the face, and hand it to the model hook."""
+    """Ask clients for a frame, crop the face, and publish emotion art."""
     os.makedirs(output_dir, exist_ok=True)
     pipeline = ProcessingPipeline(log_path=output_dir, verbose=verbose)
 
@@ -46,19 +46,15 @@ def _process_capture(server: SignalingServer, output_dir: str, verbose: int) -> 
 
 
 def _handle_processed_face(processed_face: np.ndarray, output_dir: str) -> None:
-    """Persist the cropped face and leave a hook for live generation."""
+    """Persist the face crop, classify emotion, and swap the live IVF art."""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = os.path.join(output_dir, f"face_{stamp}.npy")
     np.save(out_path, processed_face)
     print(f"Saved processed face tensor to {out_path}")
 
-    try:
-        from aura.inference.runtime import EmotionArtRuntime
+    from aura.inference.runtime import EmotionArtRuntime
 
-        runtime = EmotionArtRuntime.get_shared()
-        runtime.update_from_face(processed_face)
-    except Exception as exc:  # noqa: BLE001 - optional until models are trained
-        print(f"Live inference hook skipped: {exc}")
+    EmotionArtRuntime.get_shared().update_from_face(processed_face)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -66,13 +62,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--bind-ip",
         default=CONFIG.bind_ip,
-        help="Interface to bind (use 0.0.0.0 for LAN/cloud clients)",
+        help="Interface to bind (127.0.0.1 when using the WSS proxy)",
     )
     parser.add_argument(
         "--port",
         type=int,
         default=CONFIG.signaling_port,
-        help="Signaling WebSocket port",
+        help="Plain WS signaling port (streamer connects here)",
     )
     parser.add_argument(
         "--capture-interval",
@@ -96,7 +92,18 @@ def main(argv: list[str] | None = None) -> None:
     server = SignalingServer(port=args.port, ip=args.bind_ip)
     server.start()
     print(f"Signaling server started on ws://{args.bind_ip}:{args.port}/signaling")
+    print(
+        "For HTTPS LAN clients, also run: "
+        "python -m aura.webrtc.wss_proxy --port 3031"
+    )
     print("Press Ctrl+C to stop the server")
+
+    try:
+        from aura.inference.art_generator import EmotionArtGenerator
+
+        EmotionArtGenerator().publish("neutral", force=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"Could not seed initial IVF art: {exc}")
 
     try:
         while True:

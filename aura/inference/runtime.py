@@ -83,4 +83,12 @@ class EmotionArtRuntime:
             f"Emotion runtime: {self.last_emotion} "
             f"(embed dim={self.last_embedding.shape[-1]})"
         )
+
+        try:
+            from aura.inference.art_generator import EmotionArtGenerator
+
+            EmotionArtGenerator().publish(self.last_emotion)
+        except Exception as exc:  # noqa: BLE001 - keep classify path alive
+            print(f"Art publish skipped: {exc}")
+
         return self.last_embedding

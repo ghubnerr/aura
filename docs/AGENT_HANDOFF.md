@@ -37,21 +37,18 @@ Use **PR #43 comments** for status so both agents can read without a direct DM A
 
 ## Live demo URLs (Gabes-PC)
 
-- HTTP UI (camera may be blocked by Chrome insecure-origin rules):  
-  `http://192.168.1.200:8080/?signaling=192.168.1.200:3030`
-- HTTPS UI (preferred for getUserMedia on LAN):  
-  `python scripts/serve_ui_https.py` then  
-  `https://192.168.1.200:8443/?signaling=192.168.1.200:3030`
-
-### IVF stub (required for remote pixels)
+Preferred (HTTPS UI + **WSS proxy** — fixes mixed-content + camera):
 
 ```bat
-copy docs\samples\aura_stub.ivf ivf_files\aura_stub.ivf
-:: or regenerate:
-python scripts/make_stub_ivf.py
+python -m aura.webrtc.signaling --bind-ip 127.0.0.1 --port 3030
+python -m aura.webrtc.streamer --signaling-host 127.0.0.1 --signaling-port 3030
+python -m aura.webrtc.wss_proxy --port 3031
+python scripts/serve_ui_https.py
 ```
 
-Touching/updating a file under `ivf_files/` makes the streamer send VP8 frames.
+Open: `https://192.168.1.200:8443/?signaling=192.168.1.200:3031`
+
+Emotion captures publish `docs/samples/emotions/<emotion>.ivf` → `ivf_files/live.ivf`.
 
 ## Success criteria (MVP)
 

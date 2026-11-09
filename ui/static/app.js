@@ -1,15 +1,20 @@
 /**
  * Browser WebRTC client for Aura.
  *
- * Signaling host defaults to the page hostname so the same UI works against
- * localhost or a cloud/GPU host. Override with ?signaling=host:port.
+ * Signaling host defaults to the page hostname. Override with ?signaling=host:port
+ * Use ?tls=0 to force ws:// even on an https page (not recommended).
  */
 (function () {
   const params = new URLSearchParams(window.location.search);
   const signalingParam = params.get("signaling");
   const defaultHost = window.location.hostname || "127.0.0.1";
   const signalingTarget = signalingParam || `${defaultHost}:3030`;
-  const signalingUrl = `ws://${signalingTarget}/signaling`;
+  const forcePlain = params.get("tls") === "0";
+  const useTls =
+    !forcePlain &&
+    (window.location.protocol === "https:" || params.get("tls") === "1");
+  const scheme = useTls ? "wss" : "ws";
+  const signalingUrl = `${scheme}://${signalingTarget}/signaling`;
 
   const localVideo = document.getElementById("localVideo");
   const remoteVideo = document.getElementById("remoteVideo");
@@ -75,7 +80,10 @@
 
   signalingSocket.onerror = (error) => {
     console.error("WebSocket error:", error);
-    setStatus("WebSocket error — is the signaling server running?");
+    setStatus(
+      `WebSocket error for ${signalingUrl} — is signaling running` +
+        (useTls ? " with --tls?" : "?")
+    );
   };
 
   signalingSocket.onclose = (event) => {

@@ -87,7 +87,9 @@ kaggle.json
 *.ivf
 *.mp4
 !docs/samples/*.ivf
+!docs/samples/**/*.ivf
 !docs/samples/*.mp4
+!docs/samples/**/*.mp4
 
 temp/
 

@@ -49,6 +49,7 @@ class AuraConfig:
     clip_projection_dim: int = _DEFAULT_CLIP_PROJ_DIM
     openai_api_key: str | None = None
     gpu_host: str | None = None
+    wss_proxy_port: int = 3031
 
     @property
     def aura_storage(self) -> str:
@@ -87,6 +88,7 @@ def load_config() -> AuraConfig:
         ),
         openai_api_key=os.environ.get("OPENAI_API_KEY"),
         gpu_host=os.environ.get("AURA_GPU_HOST"),
+        wss_proxy_port=_env_int("AURA_WSS_PROXY_PORT", 3031),
     )
     os.makedirs(cfg.aura_storage, exist_ok=True)
     os.makedirs(cfg.ivf_dir, exist_ok=True)
