@@ -26,9 +26,10 @@ def test_step_keeps_shape_and_continuity():
 
 
 def test_set_conditioning_updates_engine_without_reset(tmp_path):
-    from aura.inference.continuous_art import ContinuousArtEngine
+    from aura.inference.continuous_art import ContinuousArtEngine, MorphingStubBackend
 
     engine = ContinuousArtEngine(
+        backend=MorphingStubBackend(width=64, height=48),
         ivf_dir=str(tmp_path),
         fps=12,
         chunk_frames=4,

@@ -10,8 +10,8 @@ the WebRTC track is a continuous video, with mood drifting as the embedding
 updates — never a hard cut to an unrelated clip.
 
 - ``MorphingStubBackend``: proves continuity on CPU (smooth color/motion drift).
-- ``StreamDiffusionBackend`` (later): StreamDiffusionV2 / Krea / Self-Forcing Wan
-  with the same ``step(frame, embedding)`` signature on the GPU host.
+- ``DiffusersTurboBackend``: SD-Turbo img2img on GPU (fits 16GB; recommended).
+- ``StreamDiffusionBackend``: optional StreamDiffusion v1 wrapper.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Optional, Protocol, Sequence
+from typing import Any, Optional, Protocol, Sequence
 
 import numpy as np
 
@@ -123,17 +123,28 @@ class ContinuousArtEngine:
 
     def __init__(
         self,
-        backend: Optional[MorphingStubBackend] = None,
+        backend: Optional[Any] = None,
         ivf_dir: Optional[str] = None,
-        fps: float = 24.0,
-        chunk_frames: int = 24,
+        fps: Optional[float] = None,
+        chunk_frames: Optional[int] = None,
         live_name: str = "live.ivf",
     ) -> None:
-        self.backend = backend or MorphingStubBackend()
+        if backend is None:
+            from aura.inference.diffusers_stream import create_art_backend
+
+            backend = create_art_backend()
+        self.backend = backend
         self.ivf_dir = Path(ivf_dir or CONFIG.ivf_dir)
         self.ivf_dir.mkdir(parents=True, exist_ok=True)
-        self.fps = fps
-        self.chunk_frames = chunk_frames
+
+        backend_name = type(self.backend).__name__
+        # Diffusion steps are heavier; default to a lower publish rate.
+        if fps is None:
+            fps = 6.0 if "Diffusers" in backend_name or "Stream" in backend_name else 24.0
+        if chunk_frames is None:
+            chunk_frames = 6 if fps <= 12 else 24
+        self.fps = float(os.environ.get("AURA_ART_FPS", fps))
+        self.chunk_frames = int(os.environ.get("AURA_ART_CHUNK_FRAMES", chunk_frames))
         self.live_name = live_name
 
         self._embedding = np.zeros((CONFIG.emotion_embed_dim,), dtype=np.float32)
@@ -152,7 +163,8 @@ class ContinuousArtEngine:
             return cls._shared
 
     def _seed_frame(self) -> np.ndarray:
-        h, w = self.backend.height, self.backend.width
+        h = int(getattr(self.backend, "height", 512))
+        w = int(getattr(self.backend, "width", 512))
         target = _EMOTION_RGB["neutral"].reshape(1, 1, 3)
         noise = np.random.rand(h, w, 1).astype(np.float32)
         rgb = np.clip(target * (0.55 + 0.45 * noise), 0.0, 1.0)
@@ -185,6 +197,15 @@ class ContinuousArtEngine:
         if not self._ffmpeg:
             print("ContinuousArtEngine: ffmpeg not found; cannot encode IVF chunks")
             return
+
+        # Warm the backend (downloads weights on first GPU run).
+        try:
+            warmed = self.backend.step(self._frame, self._embedding, n_frames=1)
+            self._frame = warmed[-1]
+            print(f"ContinuousArtEngine warmup ok ({type(self.backend).__name__})")
+        except Exception as exc:  # noqa: BLE001
+            print(f"ContinuousArtEngine warmup failed: {exc}")
+
         self._stop.clear()
         self._thread = threading.Thread(
             target=self._run,
@@ -193,7 +214,7 @@ class ContinuousArtEngine:
         )
         self._thread.start()
         print(
-            f"ContinuousArtEngine started "
+            f"ContinuousArtEngine started backend={type(self.backend).__name__} "
             f"({self.fps} fps, chunk={self.chunk_frames} frames)"
         )
 

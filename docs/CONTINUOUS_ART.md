@@ -2,37 +2,46 @@
 
 ## Product contract
 
-The art stream is a **continuous video**, not a playlist of clips.
-
 ```
-face crop ──► EmotionModel.embed ──► embedding e_t
-                                          │
-current art frame x_t ────────────────────┼──► backend.step(x_t, e_t) ──► x_{t+1..t+k}
-                                          │
-                                     WebRTC track (looping IVF chunks for now)
+next_frames = backend.step(current_frame, emotion_embedding)
 ```
 
-- **Input:** current image/frame `x_t` + conditioned emotion embedding `e_t`
-- **Output:** next frames `x_{t+1}`, … conditioned on that pair
-- When the viewer’s mood changes, `e_t` updates; `x_t` is **not** reset. Mood
-  drifts through the existing temporal state.
+- **Input:** current art frame `x_t` + emotion embedding `e_t`
+- **Output:** next frames continuing from `x_t`, conditioned on `e_t`
+- Mood updates change `e_t` only — temporal state is not reset
 
-## Backends
+## Backends (Gabes-PC / RTX 5060 Ti 16GB)
 
-| Backend | Role |
+| `AURA_ART_BACKEND` | Notes |
 |---|---|
-| `MorphingStubBackend` | CPU stand-in that morphs color/motion continuously |
-| StreamDiffusionV2 / Krea Realtime / Self-Forcing Wan | GPU realtime diffusion with the same `step(frame, embedding)` API |
+| `diffusers_turbo` | **Recommended.** SD-Turbo img2img; ~4–10 FPS @ 512² in fp16 |
+| `streamdiffusion` | Optional if `pip install streamdiffusion` |
+| `morphing` | CPU stub (no GPU) |
+| `auto` | CUDA → diffusers_turbo, else morphing |
 
-Clip-based `EmotionArtGenerator.publish(emotion)` is **demo fallback only**.
+StreamDiffusionV2 / Krea Realtime need ~24–32GB VRAM — too large for 16GB today.
+Same `step()` API when VRAM allows.
 
-## Host loop
+### Emotion → prompt
 
-`ContinuousArtEngine` runs on the GPU host (Gabes-PC):
+The 2048-d embedding selects the emotion label; that label maps to an abstract
+art prompt. Denoise **strength** (~0.42) keeps the previous frame as init image
+so the stream stays continuous. Embedding energy nudges strength slightly.
 
-1. Keep `current_frame` in memory
-2. On each capture, `set_conditioning(embedding, emotion)`
-3. Every tick: `frames = backend.step(current_frame, embedding)`
-4. Encode a short VP8 chunk → `ivf_files/live.ivf` for the Rust streamer
+## Host
 
-Later we can push samples directly into the WebRTC track and drop IVF files.
+```bat
+scripts\start_gpu_host.bat
+```
+
+Or manually:
+
+```bat
+set AURA_ART_BACKEND=diffusers_turbo
+python -m aura.webrtc.signaling --bind-ip 127.0.0.1 --port 3030
+python -m aura.webrtc.streamer --signaling-host 127.0.0.1 --signaling-port 3030
+python -m aura.webrtc.wss_proxy --port 3031
+python scripts/serve_ui_https.py
+```
+
+First signaling start downloads `stabilityai/sd-turbo` and warms the pipeline.
