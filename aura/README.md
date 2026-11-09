@@ -19,9 +19,21 @@ Serve the UI (from another terminal):
 
 ```bash
 python -m http.server 8080 --directory ui/static
+# Preferred on LAN (camera needs a secure context):
+python scripts/serve_ui_https.py
 ```
 
-Open `http://<host-ip>:8080/?signaling=<host-ip>:3030` from a browser on the same network (or your laptop if the cloud host is publicly reachable).
+Open:
+- `http://<host-ip>:8080/?signaling=<host-ip>:3030` or
+- `https://<host-ip>:8443/?signaling=<host-ip>:3030` (accept self-signed cert)
+
+Seed a stub art track so the remote video shows pixels:
+
+```bash
+mkdir -p ivf_files
+cp docs/samples/aura_stub.ivf ivf_files/
+# or: python scripts/make_stub_ivf.py
+```
 
 ### Testing
 

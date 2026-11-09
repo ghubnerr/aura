@@ -35,6 +35,24 @@ Later (after host works): emotion checkpoint load, Wan pair-gen smoke on 5060, S
 
 Use **PR #43 comments** for status so both agents can read without a direct DM API.
 
+## Live demo URLs (Gabes-PC)
+
+- HTTP UI (camera may be blocked by Chrome insecure-origin rules):  
+  `http://192.168.1.200:8080/?signaling=192.168.1.200:3030`
+- HTTPS UI (preferred for getUserMedia on LAN):  
+  `python scripts/serve_ui_https.py` then  
+  `https://192.168.1.200:8443/?signaling=192.168.1.200:3030`
+
+### IVF stub (required for remote pixels)
+
+```bat
+copy docs\samples\aura_stub.ivf ivf_files\aura_stub.ivf
+:: or regenerate:
+python scripts/make_stub_ivf.py
+```
+
+Touching/updating a file under `ivf_files/` makes the streamer send VP8 frames.
+
 ## Success criteria (MVP)
 
 1. Browser on LAN sees local camera + remote art track (even a looping IVF stub)
