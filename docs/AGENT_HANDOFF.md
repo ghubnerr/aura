@@ -3,35 +3,26 @@
 **Branch / PR:** `cursor/cleanup-modernize-1aa4` → https://github.com/ghubnerr/aura/pull/43  
 **Windows:** Gabes-PC @ `192.168.1.200`
 
-## Fix for “NEUTRAL text / gray / emotion stuck”
+## Emotion CNN trained — load it live
 
-You were still seeing the **old labeled stub IVF** (burned-in NEUTRAL + crop).  
-Do a clean restart on the **morphing** continuous path (no text overlays):
+Assuming `output\aura_storage\aura_emotion_classifier.pth` exists on Gabes-PC:
 
 ```bat
-:: kill old stack first
 taskkill /FI "WINDOWTITLE eq aura-*" /F
-
+cd /d c:\Users\gabri\Projects\aura
 git pull origin cursor/cleanup-modernize-1aa4
+set STORAGE_PATH=.\output
 scripts\start_host.bat
 ```
 
-Open `https://192.168.1.200:8443/?signaling=192.168.1.200:3031` and **Ctrl+Shift+R**.
+Verify:
+1. `python scripts\verify_emotion_ckpt.py` → `OK: checkpoint loads`
+2. Signaling log: `Emotion runtime: loaded checkpoint ...` (no demo heuristic)
+3. UI Emotion updates **without** `[demo]` after Capture Face
 
-Expect:
-1. Colorful continuous motion on the left (full frame, letterboxed — not cropped text)
-2. Emotion updates within ~1s of Capture Face (`[demo]` until a real checkpoint exists)
-3. Art meta shows `MorphingStubBackend`
+Please paste best val acc / `emotion_train_metrics.json` on PR #43 if not already.
 
-GPU diffusion (optional later): `scripts\start_gpu_host.bat` with free VRAM.
+## Next
 
-## Train emotion CNN (next — do this on Gabes-PC)
-
-```bat
-:: Kaggle creds required for AffectNet download via kagglehub
-git pull origin cursor/cleanup-modernize-1aa4
-scripts\train_emotion.bat
-```
-
-When it finishes, restart signaling. UI emotion should drop `[demo]` and use the
-trained ResNet. See `docs/TRAINING.md`.
+1. CLIP emotion↔art alignment (`python -m aura.clip.train`)
+2. Condition SD-Turbo on the embedding (LoRA / IP-Adapter)
