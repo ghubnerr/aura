@@ -3,30 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rust WebRTC.rs Application</title>
+    <title>Aura</title>
     <style>
-        video, img {
+        :root {
+            color-scheme: dark;
+            --bg: #0b1016;
+            --panel: #151c24;
+            --text: #e7eef7;
+            --muted: #9db0c5;
+            --accent: #3dd6c6;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            background:
+                radial-gradient(ellipse at 20% 0%, #1a2a38 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, #142018 0%, transparent 45%),
+                var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: 12px 20px;
+            margin-bottom: 12px;
+        }
+        h1 {
+            margin: 0;
+            font-weight: 650;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 1.4rem;
+        }
+        #status, #emotion, #artMeta {
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+        #emotion strong, #artMeta strong { color: var(--accent); font-weight: 600; }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        button {
+            background: var(--accent);
+            color: #04201d;
+            border: 0;
+            border-radius: 6px;
+            padding: 10px 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .stage {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 12px;
+        }
+        @media (min-width: 900px) {
+            .stage {
+                grid-template-columns: minmax(0, 2.2fr) minmax(180px, 0.8fr);
+                align-items: start;
+            }
+        }
+        .art-panel, .side-panel {
+            position: relative;
+        }
+        .label {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            z-index: 2;
+            font-size: 0.75rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #d7e7f7;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        #remoteVideo {
+            width: 100%;
+            max-height: 70vh;
+            aspect-ratio: 4 / 3;
+            background: #05080c;
+            border-radius: 10px;
+            /* contain = full frame visible (no cropped NEUTRAL text / edges) */
+            object-fit: contain;
             display: block;
-            margin: 10px 0;
-            max-width: 100%;
+        }
+        .side-panel video,
+        .side-panel img {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: var(--panel);
+            border-radius: 8px;
+            object-fit: contain;
+            display: block;
+            margin-bottom: 8px;
         }
         #capturedImage {
-            border: 2px solid #ccc;
             display: none;
+            opacity: 0.85;
+            border: 1px solid #334155;
+        }
+        .hint {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-top: 8px;
+            max-width: 52rem;
         }
     </style>
 </head>
 <body>
-    <h2>Rust WebRTC.rs Application</h2>
+    <header>
+        <h1>Aura</h1>
+        <div id="status">Connecting to signaling…</div>
+        <div id="emotion">Emotion: <strong>—</strong></div>
+        <div id="artMeta">Art: <strong>—</strong></div>
+    </header>
 
-    <video id="localVideo" autoplay muted></video>
-    <video id="remoteVideo" autoplay></video>
+    <div class="controls">
+        <button id="startCall" disabled>Start Call</button>
+        <button id="captureImage" disabled>Capture Face</button>
+    </div>
 
-    <button id="startCall">Start Call</button>
-    <button id="answerCall">Answer Call</button>
-    <button id="captureImage">Capture</button>
+    <div class="stage">
+        <div class="art-panel">
+            <span class="label">Art stream</span>
+            <video id="remoteVideo" autoplay playsinline muted></video>
+        </div>
+        <div class="side-panel">
+            <span class="label">You</span>
+            <video id="localVideo" autoplay muted playsinline></video>
+            <img id="capturedImage" alt="Last face capture" />
+        </div>
+    </div>
 
-    <img id="capturedImage" alt="Captured Frame" />
+    <p class="hint">
+        Left = continuous art (full frame, letterboxed if needed). Right = camera.
+        Emotion should update within a second of Capture Face. If you still see
+        burned-in “NEUTRAL” text, hard-refresh after the host restarts.
+    </p>
 
     <script src="app.js"></script>
 </body>

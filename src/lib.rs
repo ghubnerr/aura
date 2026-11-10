@@ -1,10 +1,12 @@
+//! Aura native extension: WebRTC signaling + IVF video streaming for Python.
+
 use pyo3::prelude::*;
 
 mod server;
 mod signaling_types;
-pub use signaling_types::SignalingMessage;
-
 mod streamer;
+
+pub use signaling_types::SignalingMessage;
 
 use server::SignalingServer;
 use streamer::VideoStreamer;
@@ -42,5 +44,27 @@ mod tests {
         let serialized = serde_json::to_string(&offer).unwrap();
         assert!(serialized.contains("offer"));
         assert!(serialized.contains("test_sdp"));
+    }
+
+    #[test]
+    fn test_candidate_accepts_browser_camel_case() {
+        let json = r#"{
+            "type": "candidate",
+            "candidate": "candidate:1 1 UDP 1 1.2.3.4 1234 typ host",
+            "sdpMid": "0",
+            "sdpMLineIndex": 0
+        }"#;
+        let parsed: SignalingMessage = serde_json::from_str(json).unwrap();
+        match parsed {
+            SignalingMessage::Candidate {
+                sdp_mid,
+                sdp_mline_index,
+                ..
+            } => {
+                assert_eq!(sdp_mid.as_deref(), Some("0"));
+                assert_eq!(sdp_mline_index, Some(0));
+            }
+            other => panic!("unexpected variant: {:?}", other),
+        }
     }
 }

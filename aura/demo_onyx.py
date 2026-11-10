@@ -1,128 +1,108 @@
+"""Legacy websocket demo that classifies a face and streams a canned clip.
+
+Prefer the Rust WebRTC path (`python -m aura.webrtc.signaling` + streamer).
+This script remains for quick emotion-classifier smoke tests on a GPU box.
+"""
+
+from __future__ import annotations
+
 import asyncio
-import websockets
 import os
+from typing import Dict
+
 import cv2
 import numpy as np
 import torch
+import websockets
 
-from .embed.model import EmotionModel  # Adjusted import
-from .dataset.t2v_model import LatteT2VideoPipeline, create_prompt
+from aura.cnn import EmotionModel
+from aura.config import CONFIG
+from aura.dataset.t2v_model import create_prompt
 
-# Path to your pre-defined video
-PREDEFINED_VIDEO_PATH = "/disk/onyx-scratch/dullo009-fall2024/backdrops/refik/refik_sadness_532.mp4"
+PREDEFINED_VIDEO_PATH = os.environ.get(
+    "AURA_DEMO_VIDEO",
+    os.path.join(CONFIG.storage_path, "demo", "refik_sadness.mp4"),
+)
 
-# Initialize Emotion Model
-emotion_model = EmotionModel(pretrained=False)
-model_dir = os.path.join(os.environ.get("STORAGE_PATH"), "aura_storage", "aura_emotion_classifier.pth")
-emotion_model.load(model_dir)
-emotion_model.eval()
-
-# Emotion Label Mapping
-label_map = {
+LABEL_MAP: Dict[int, str] = {
     0: "happy",
     1: "sad",
-    2: "disgust",
-    3: "fear",
-    4: "anger",
+    2: "anger",
+    3: "disgust",
+    4: "fear",
     5: "neutral",
-    6: "happy",
-    7: "neutral"
+    6: "surprise",
+    7: "contempt",
 }
 
-# Dictionary to keep track of active streaming tasks per client
-active_streams = {}
+emotion_model = EmotionModel(pretrained=False)
+if os.path.isfile(CONFIG.emotion_checkpoint):
+    emotion_model.load(CONFIG.emotion_checkpoint)
+emotion_model.eval()
 
-async def stream_video(websocket):
-    """
-    Streams the pre-defined video frame by frame to the client.
-    """
-    cap = cv2.VideoCapture(PREDEFINED_VIDEO_PATH)
-    if not cap.isOpened():
-        error_message = f"ERROR: Cannot open video file at {PREDEFINED_VIDEO_PATH}."
-        print(error_message)
-        await websocket.send(error_message.encode('utf-8'))
+active_streams: Dict[websockets.WebSocketServerProtocol, asyncio.Task] = {}
+
+
+async def stream_video(websocket: websockets.WebSocketServerProtocol) -> None:
+    capture = cv2.VideoCapture(PREDEFINED_VIDEO_PATH)
+    if not capture.isOpened():
+        await websocket.send(
+            f"ERROR: Cannot open video file at {PREDEFINED_VIDEO_PATH}.".encode("utf-8")
+        )
         return
 
     try:
         while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("End of video reached. Looping video.")
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ok, frame = capture.read()
+            if not ok:
+                capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
-
-            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 80]  # Adjust quality as needed
-            _, buffer = cv2.imencode('.jpg', frame, encode_param)
-            frame_bytes = buffer.tobytes()
-
-            await websocket.send(frame_bytes)
-
+            _ok, buffer = cv2.imencode(
+                ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80]
+            )
+            await websocket.send(buffer.tobytes())
             await asyncio.sleep(1 / 30)
-
     except websockets.ConnectionClosed:
         print("Connection closed while streaming video.")
     finally:
-        cap.release()
-        if websocket in active_streams:
-            del active_streams[websocket]
+        capture.release()
+        active_streams.pop(websocket, None)
 
-async def handle_client(websocket):
-    """
-    Handles incoming client connections. For each received frame, starts streaming video if not already streaming.
-    """
+
+async def handle_client(websocket: websockets.WebSocketServerProtocol) -> None:
     print(f"Client connected from {websocket.remote_address}")
-
     try:
         async for message in websocket:
-            # Check if the message is a binary frame
-            if isinstance(message, bytes):
-                print("Received a frame from client.")
+            if not isinstance(message, bytes):
+                print(f"Received text message: {message}")
+                continue
 
-                # If not already streaming, start streaming
-                if websocket not in active_streams:
-                    print("Starting video stream to client.")
-                    stream_task = asyncio.create_task(stream_video(websocket))
-                    active_streams[websocket] = stream_task
-                else:
-                    print("Video stream already active for this client.")
+            if websocket not in active_streams:
+                active_streams[websocket] = asyncio.create_task(stream_video(websocket))
 
-                # Optionally, process the received frame (e.g., emotion analysis)
-                # This part can be customized based on your requirements
-                print("Procssing input frame")
-                nparr = np.frombuffer(message, np.uint8)
-                img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            image = cv2.imdecode(np.frombuffer(message, np.uint8), cv2.IMREAD_COLOR)
+            if image is None:
+                continue
 
-                with torch.no_grad():
-                    logits = emotion_model.embed(img)
-                    pred = torch.argmax(logits, dim=1).item()
-                    emotion = label_map.get(pred, "neutral")
-                    print(f"Predicting emotion...{emotion}")
-
-                prompt = create_prompt(emotion)
-
-                # If you want to send a response based on the emotion, implement it here
-                # Do emotion classification and set `PREDIFINED_VIDEO_PATH`
-
-            else:
-                print(f"Received a text message: {message}")
-
+            with torch.no_grad():
+                logits = emotion_model.embed(image, use_representation=False)
+                pred = int(torch.argmax(logits, dim=1).item())
+                emotion = LABEL_MAP.get(pred, "neutral")
+                print(f"Predicted emotion: {emotion}")
+                print(f"Prompt: {create_prompt(emotion)}")
     except websockets.ConnectionClosed:
         print(f"Client {websocket.remote_address} disconnected.")
-
     finally:
-        if websocket in active_streams:
-            active_streams[websocket].cancel()
-            del active_streams[websocket]
+        task = active_streams.pop(websocket, None)
+        if task is not None:
+            task.cancel()
 
-async def main():
-    async with websockets.serve(
-        handle_client,
-        "0.0.0.0",  # Listen on all interfaces
-        6000,       # Port number
-        max_size=None  # Remove size limit for incoming messages
-    ):
-        print("WebSocket server started on ws://localhost:6000")
-        await asyncio.Future()  # Run forever
+
+async def main() -> None:
+    async with websockets.serve(handle_client, "0.0.0.0", 6000, max_size=None):
+        print("WebSocket demo server started on ws://0.0.0.0:6000")
+        await asyncio.Future()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

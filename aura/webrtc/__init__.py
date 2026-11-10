@@ -1,5 +1,6 @@
-from aura import SignalingServer
-from aura import VideoStreamer
+"""Python entrypoints for the Rust WebRTC signaling + streamer."""
 
-__version__ = "0.1.0"
+from aura import SignalingServer, VideoStreamer
+
 __all__ = ["SignalingServer", "VideoStreamer"]
+__version__ = "0.1.0"
