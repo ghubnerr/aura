@@ -24,3 +24,14 @@ Expect:
 3. Art meta shows `MorphingStubBackend`
 
 GPU diffusion (optional later): `scripts\start_gpu_host.bat` with free VRAM.
+
+## Train emotion CNN (next — do this on Gabes-PC)
+
+```bat
+:: Kaggle creds required for AffectNet download via kagglehub
+git pull origin cursor/cleanup-modernize-1aa4
+scripts\train_emotion.bat
+```
+
+When it finishes, restart signaling. UI emotion should drop `[demo]` and use the
+trained ResNet. See `docs/TRAINING.md`.

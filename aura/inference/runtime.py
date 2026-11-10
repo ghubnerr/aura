@@ -32,14 +32,16 @@ class EmotionArtRuntime:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = EmotionModel(pretrained=False)
         path = checkpoint or CONFIG.emotion_checkpoint
+        self.checkpoint_path = path
         self.use_demo_heuristic = not os.path.isfile(path)
         if not self.use_demo_heuristic:
             self.model.load(path)
+            print(f"Emotion runtime: loaded checkpoint {path}")
         else:
             self.model.to(self.device)
             print(
                 "Emotion runtime: no checkpoint at "
-                f"{path} — using demo face-color heuristic for labels"
+                f"{path} - using demo face-color heuristic for labels"
             )
         self.model.eval()
         self.last_embedding: Optional[np.ndarray] = None
