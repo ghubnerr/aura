@@ -18,9 +18,7 @@ import os
 import random
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import torch
 from sklearn.metrics import classification_report, confusion_matrix
 
@@ -42,6 +40,15 @@ LABEL_NAMES = [
 
 def create_heatmap(true_labels, pred_labels, path: str) -> None:
     matrix = confusion_matrix(true_labels, pred_labels, labels=list(range(8)))
+    os.makedirs(path, exist_ok=True)
+    np.save(os.path.join(path, "confusion_matrix.npy"), matrix)
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError:
+        print("matplotlib/seaborn not installed; skipped confusion_matrix.png")
+        return
+
     plt.figure(figsize=(8, 6))
     sns.heatmap(
         matrix,
@@ -53,7 +60,6 @@ def create_heatmap(true_labels, pred_labels, path: str) -> None:
     )
     plt.xlabel("Predicted")
     plt.ylabel("True")
-    os.makedirs(path, exist_ok=True)
     out = os.path.join(path, "confusion_matrix.png")
     plt.tight_layout()
     plt.savefig(out)
